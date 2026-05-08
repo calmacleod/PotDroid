@@ -31,4 +31,28 @@ RSpec.describe PairingSession, type: :model do
 
     expect(described_class.claim!(raw_code: raw_code, device_name: "Pixel")).to be_nil
   end
+
+  it "generates compact pairing payloads for scannable QR codes" do
+    pairing_session = build(:pairing_session)
+
+    payload = pairing_session.pairing_payload(
+      raw_code: "ABCD-EFGH-JK23",
+      api_base_url: "https://example.trycloudflare.com"
+    )
+
+    expect(payload).to eq("potdroid://pair?u=https%3A%2F%2Fexample.trycloudflare.com&c=ABCD-EFGH-JK23")
+  end
+
+  it "renders QR SVGs with an explicit quiet zone" do
+    pairing_session = build(:pairing_session)
+
+    svg = pairing_session.qr_svg(
+      raw_code: "ABCD-EFGH-JK23",
+      api_base_url: "https://example.trycloudflare.com"
+    )
+
+    expect(svg).to match(/viewBox="0 0 \d+ \d+"/)
+    expect(svg).to include('<rect width="100%" height="100%" fill="#fff"/>')
+    expect(svg).to include('M64 64h8v8h-8z')
+  end
 end

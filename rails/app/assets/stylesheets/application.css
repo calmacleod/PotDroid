@@ -602,19 +602,21 @@ input[type="submit"].button.primary {
 }
 
 .qr-wrap {
-  width: min(100%, 260px);
+  width: min(100%, 440px);
   max-width: 100%;
   margin: 0 auto;
-  padding: 10px;
+  padding: 0;
   border: 1px solid var(--border);
   background: white;
   border-radius: 8px;
+  overflow: hidden;
 }
 
 .qr-wrap svg {
   display: block;
   width: 100%;
   height: auto;
+  overflow: visible;
 }
 
 .qr-column {
@@ -656,8 +658,8 @@ input[type="submit"].button.primary {
 
 .split-panel {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
+  gap: 16px;
 }
 
 .pairing-panel {

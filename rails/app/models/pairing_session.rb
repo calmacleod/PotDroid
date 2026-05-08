@@ -57,18 +57,31 @@ class PairingSession < ApplicationRecord
     URI::Generic.build(
       scheme: "potdroid",
       host: "pair",
-      query: URI.encode_www_form(api_base_url: api_base_url, code: raw_code)
+      query: URI.encode_www_form(u: api_base_url, c: raw_code)
     ).to_s
   end
 
   def qr_svg(raw_code:, api_base_url:)
-    RQRCode::QRCode.new(pairing_payload(raw_code: raw_code, api_base_url: api_base_url)).as_svg(
-      color: "000",
-      shape_rendering: "crispEdges",
-      module_size: 6,
-      standalone: true,
-      use_path: true
-    )
+    qr_code = RQRCode::QRCode.new(pairing_payload(raw_code: raw_code, api_base_url: api_base_url))
+    module_size = 8
+    quiet_modules = 8
+    size = (qr_code.modules.size + (quiet_modules * 2)) * module_size
+    path = qr_code.modules.each_with_index.flat_map do |row, row_index|
+      row.each_with_index.filter_map do |dark, column_index|
+        next unless dark
+
+        x = (column_index + quiet_modules) * module_size
+        y = (row_index + quiet_modules) * module_size
+        "M#{x} #{y}h#{module_size}v#{module_size}h-#{module_size}z"
+      end
+    end.join
+
+    <<~SVG.squish
+      <svg xmlns="http://www.w3.org/2000/svg" width="#{size}" height="#{size}" viewBox="0 0 #{size} #{size}" shape-rendering="crispEdges" role="img" aria-label="PotDroid pairing QR code">
+        <rect width="100%" height="100%" fill="#fff"/>
+        <path d="#{path}" fill="#000"/>
+      </svg>
+    SVG
   end
 
   def self.normalize_code(raw_code)

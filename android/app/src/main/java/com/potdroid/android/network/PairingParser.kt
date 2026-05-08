@@ -42,8 +42,8 @@ object PairingParser {
                 decode(key) to decode(value)
             }
 
-        val apiBaseUrl = params["api_base_url"].orEmpty()
-        val code = params["code"].orEmpty()
+        val apiBaseUrl = params["u"].orEmpty().ifBlank { params["api_base_url"].orEmpty() }
+        val code = params["c"].orEmpty().ifBlank { params["code"].orEmpty() }
         if (apiBaseUrl.isBlank() || code.isBlank()) return null
 
         return ParsedPairing(apiBaseUrl = apiBaseUrl, code = code)

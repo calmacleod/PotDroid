@@ -27,6 +27,17 @@ class PairingParserTest {
     }
 
     @Test
+    fun parsesCompactDeepLinkPayload() {
+        val parsed = PairingParser.parse(
+            input = "potdroid://pair?u=https%3A%2F%2Fpair.example&c=ABCD-EFGH-JK23",
+            fallbackApiBaseUrl = "https://fallback.example",
+        )
+
+        assertEquals("https://pair.example", parsed.apiBaseUrl)
+        assertEquals("ABCD-EFGH-JK23", parsed.code)
+    }
+
+    @Test
     fun treatsPlainTextAsPairingCode() {
         val parsed = PairingParser.parse(
             input = "ABCD-EFGH-JK23",
