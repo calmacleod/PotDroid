@@ -1,17 +1,25 @@
 module ApplicationHelper
   def candidate_bounding_box(candidate)
-    box = normalized_bounding_box(candidate.bounding_box)
+    detection_bounding_box(candidate.bounding_box)
+  end
+
+  def detector_validation_bounding_box(result)
+    detection_bounding_box(result&.dig("bounding_box"), class_name: "detection-box validation-detection-box", label: "Detector validation bounding box")
+  end
+
+  def detection_bounding_box(raw_box, class_name: "detection-box", label: "Pothole bounding box")
+    box = normalized_bounding_box(raw_box)
     return if box.blank?
 
     tag.span(
-      class: "detection-box",
+      class: class_name,
       style: [
         "--box-left: #{box[:left]}%;",
         "--box-top: #{box[:top]}%;",
         "--box-width: #{box[:right] - box[:left]}%;",
         "--box-height: #{box[:bottom] - box[:top]}%;"
       ].join(" "),
-      aria: { label: "Pothole bounding box" }
+      aria: { label: label }
     )
   end
 

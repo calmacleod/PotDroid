@@ -29,6 +29,47 @@ RSpec.describe "Candidate pothole review", type: :request do
     expect(response.body).to include("--box-height: 30.0%")
   end
 
+  it "runs detector validation for the candidate image and renders the result" do
+    detector_result = {
+      "detected" => true,
+      "confidence" => 0.82,
+      "threshold" => 0.25,
+      "model_version" => "pot-yolo-int8-780aff5",
+      "bounding_box" => {
+        "left" => 0.15,
+        "top" => 0.25,
+        "right" => 0.45,
+        "bottom" => 0.55
+      },
+      "detections" => []
+    }
+
+    allow(PotholeDetector::TfliteValidator).to receive(:new).and_return(instance_double(PotholeDetector::TfliteValidator, call: detector_result))
+
+    post validate_detector_candidate_pothole_path(candidate)
+    expect(response).to redirect_to(candidate_pothole_path(candidate))
+
+    follow_redirect!
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Detector validation")
+    expect(response.body).to include("Detected")
+    expect(response.body).to include("82.0%")
+    expect(response.body).to include("validation-detection-box")
+    expect(response.body).to include("--box-left: 15.0%")
+  end
+
+  it "renders detector validation errors on the review page" do
+    allow(PotholeDetector::TfliteValidator).to receive(:new).and_raise(PotholeDetector::Unavailable, "install detector runtime")
+
+    post validate_detector_candidate_pothole_path(candidate)
+    expect(response).to redirect_to(candidate_pothole_path(candidate))
+
+    follow_redirect!
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Detector validation")
+    expect(response.body).to include("install detector runtime")
+  end
+
   it "shows when an Android device is paired" do
     create(
       :pairing_session,

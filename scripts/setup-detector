@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHON="${POTDROID_DETECTOR_SETUP_PYTHON:-}"
+
+if [ -z "$PYTHON" ]; then
+  if command -v python3.12 >/dev/null 2>&1; then
+    PYTHON="python3.12"
+  elif [ -x /opt/homebrew/bin/python3.12 ]; then
+    PYTHON="/opt/homebrew/bin/python3.12"
+  else
+    echo "Python 3.12 is required for the current ai-edge-litert wheels."
+    echo "Install it or set POTDROID_DETECTOR_SETUP_PYTHON=/path/to/python3.12."
+    exit 1
+  fi
+fi
+
+"$PYTHON" -m venv "$ROOT/rails/tmp/detector-venv"
+"$ROOT/rails/tmp/detector-venv/bin/python" -m pip install -r "$ROOT/rails/requirements-detector.txt"

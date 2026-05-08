@@ -458,7 +458,8 @@ input[type="submit"].button.primary {
 }
 
 .status-rejected,
-.status-failed {
+.status-failed,
+.status-duplicate {
   background: var(--danger-bg);
   color: var(--danger);
   border-color: #f3bbb5;
@@ -512,6 +513,13 @@ input[type="submit"].button.primary {
   align-items: start;
 }
 
+.detector-lab-grid {
+  display: grid;
+  grid-template-columns: 390px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
 .image-stage {
   border: 1px solid var(--border);
   background: #111827;
@@ -553,6 +561,15 @@ input[type="submit"].button.primary {
   background: rgba(34, 197, 94, 0.22);
 }
 
+.validation-detection-box {
+  border-color: #38bdf8;
+  border-style: dashed;
+  background: rgba(56, 189, 248, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(8, 47, 73, 0.8),
+    0 0 0 9999px rgba(0, 0, 0, 0.02);
+}
+
 .side-stack {
   display: grid;
   gap: 10px;
@@ -586,6 +603,64 @@ input[type="submit"].button.primary {
 
 .panel-actions {
   margin-top: 10px;
+}
+
+.reconciliation-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.reconciliation-summary {
+  margin-bottom: 12px;
+}
+
+.reconciliation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.candidate-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+  overflow: hidden;
+}
+
+.candidate-card.suggested {
+  border-color: #a7dbc4;
+  background: var(--success-bg);
+}
+
+.candidate-card-media {
+  background: #111827;
+}
+
+.reconciliation-thumb,
+.reconciliation-thumb.thumbnail {
+  width: 100%;
+  height: 180px;
+  border-radius: 0;
+}
+
+.reconciliation-thumb .thumbnail {
+  width: 100%;
+  height: 180px;
+  border: 0;
+  border-radius: 0;
+}
+
+.candidate-card-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.candidate-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
 }
 
 .definition-list {
@@ -763,6 +838,7 @@ input[type="submit"].button.primary {
   }
 
   .detail-grid,
+  .detector-lab-grid,
   .split-panel {
     grid-template-columns: 1fr;
   }

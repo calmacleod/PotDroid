@@ -10,6 +10,7 @@ security:
 tags:
   - name: Pairing
   - name: Candidate Potholes
+  - name: Detector Validation
 paths:
   /api/v1/pairing:
     post:
@@ -168,6 +169,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/detector_validation:
+    post:
+      tags:
+        - Detector Validation
+      summary: Run the local TFLite detector against an image
+      description: Development endpoint that validates whether the bundled local detector would catch an uploaded image. It does not create a candidate pothole.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                threshold:
+                  type: number
+                  format: double
+                  default: 0.25
+                  minimum: 0
+                  maximum: 1
+      responses:
+        "200":
+          description: Local detector result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectorValidationResponse"
+        "400":
+          description: Required parameter is missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer token is missing or invalid.
+        "422":
+          description: Local detector inference failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Local detector runtime is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     bearerAuth:
@@ -225,6 +277,11 @@ components:
             - rejected
             - submitted
             - closed
+            - duplicate
+        duplicate_of_id:
+          type:
+            - integer
+            - "null"
         latitude:
           type: number
           format: double
@@ -283,6 +340,51 @@ components:
             - string
             - "null"
           format: date-time
+    DetectorValidationResponse:
+      type: object
+      properties:
+        detected:
+          type: boolean
+        confidence:
+          type:
+            - number
+            - "null"
+          format: double
+        threshold:
+          type: number
+          format: double
+        model_version:
+          type: string
+          example: pot-yolo-int8-780aff5
+        bounding_box:
+          anyOf:
+            - $ref: "#/components/schemas/BoundingBox"
+            - type: "null"
+        detections:
+          type: array
+          items:
+            type: object
+            properties:
+              confidence:
+                type: number
+                format: double
+              bounding_box:
+                $ref: "#/components/schemas/BoundingBox"
+    BoundingBox:
+      type: object
+      properties:
+        left:
+          type: number
+          format: double
+        top:
+          type: number
+          format: double
+        right:
+          type: number
+          format: double
+        bottom:
+          type: number
+          format: double
     ErrorResponse:
       type: object
       properties:

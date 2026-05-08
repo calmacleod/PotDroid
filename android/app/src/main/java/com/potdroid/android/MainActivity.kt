@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Build
 import android.os.Bundle
+import android.util.Size as AndroidSize
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -14,6 +15,8 @@ import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraXPreview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
@@ -124,6 +127,7 @@ fun PotDroidApp(initialPairingInput: String = "") {
     var scanningStatus by remember { mutableStateOf("Model ready") }
     var scannerLog by remember { mutableStateOf<List<String>>(emptyList()) }
     var hasCameraPermission by remember { mutableStateOf(false) }
+    var driveStarted by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
@@ -167,6 +171,8 @@ fun PotDroidApp(initialPairingInput: String = "") {
                         settings.apiToken = token
                         apiToken = token
                         pairingInput = ""
+                        driveStarted = false
+                        scanningStatus = "Ready"
                         pairingStatus = "Paired. Long-lived token saved."
                     }
                 } else {
@@ -214,6 +220,7 @@ fun PotDroidApp(initialPairingInput: String = "") {
         scanningStatus = scanningStatus,
         scannerLog = scannerLog,
         hasCameraPermission = hasCameraPermission,
+        driveStarted = driveStarted,
         onApiBaseUrlChange = { apiBaseUrl = it },
         onApiTokenChange = { apiToken = it },
         onPairingInputChange = { pairingInput = it },
@@ -229,8 +236,19 @@ fun PotDroidApp(initialPairingInput: String = "") {
         onUnpair = {
             settings.apiToken = ""
             apiToken = ""
+            driveStarted = false
             pairingStatus = null
             connectivityStatus = "Device unpaired."
+        },
+        onStartDrive = {
+            driveStarted = true
+            scanningStatus = "Scanning"
+            appendScannerLog("Drive started")
+        },
+        onStopDrive = {
+            driveStarted = false
+            scanningStatus = "Ready"
+            appendScannerLog("Drive stopped")
         },
         onRequestPermissions = {
             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
@@ -258,6 +276,7 @@ fun PotDroidScreen(
     scanningStatus: String,
     scannerLog: List<String>,
     hasCameraPermission: Boolean,
+    driveStarted: Boolean,
     onApiBaseUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
     onPairingInputChange: (String) -> Unit,
@@ -266,6 +285,8 @@ fun PotDroidScreen(
     onQrScanned: (String) -> Unit,
     onTestConnection: () -> Unit,
     onUnpair: () -> Unit,
+    onStartDrive: () -> Unit,
+    onStopDrive: () -> Unit,
     onRequestPermissions: () -> Unit,
     modifier: Modifier = Modifier,
     drivingCameraContent: @Composable (Modifier) -> Unit = { cameraModifier ->
@@ -299,11 +320,14 @@ fun PotDroidScreen(
             scanningStatus = scanningStatus,
             scannerLog = scannerLog,
             hasCameraPermission = hasCameraPermission,
+            driveStarted = driveStarted,
             onApiBaseUrlChange = onApiBaseUrlChange,
             onApiTokenChange = onApiTokenChange,
             onSave = onSave,
             onTestConnection = onTestConnection,
             onUnpair = onUnpair,
+            onStartDrive = onStartDrive,
+            onStopDrive = onStopDrive,
             onRequestPermissions = onRequestPermissions,
             cameraContent = drivingCameraContent,
             modifier = modifier,
@@ -429,11 +453,14 @@ private fun DrivingScreen(
     scanningStatus: String,
     scannerLog: List<String>,
     hasCameraPermission: Boolean,
+    driveStarted: Boolean,
     onApiBaseUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
     onSave: () -> Unit,
     onTestConnection: () -> Unit,
     onUnpair: () -> Unit,
+    onStartDrive: () -> Unit,
+    onStopDrive: () -> Unit,
     onRequestPermissions: () -> Unit,
     cameraContent: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
@@ -446,13 +473,15 @@ private fun DrivingScreen(
             .background(Color(0xFF070B12))
             .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
-        if (hasCameraPermission) {
+        if (driveStarted && hasCameraPermission) {
             cameraContent(Modifier.fillMaxSize())
-        } else {
+        } else if (driveStarted) {
             CameraPermissionPlaceholder(
                 modifier = Modifier.fillMaxSize(),
                 onRequestPermissions = onRequestPermissions,
             )
+        } else {
+            DriveSetupPlaceholder(modifier = Modifier.fillMaxSize())
         }
 
         Box(
@@ -479,8 +508,8 @@ private fun DrivingScreen(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    LiveDot()
-                    Text("Scanning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    if (driveStarted) LiveDot()
+                    Text(if (driveStarted) "Scanning" else "Ready", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -503,6 +532,53 @@ private fun DrivingScreen(
                         settingsOpen = false
                         onUnpair()
                     })
+                    if (driveStarted) {
+                        DropdownMenuItem(text = { Text("Stop drive") }, onClick = {
+                            settingsOpen = false
+                            onStopDrive()
+                        })
+                    }
+                }
+            }
+        }
+
+        if (!driveStarted) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(20.dp)
+                    .fillMaxWidth(),
+                color = Color(0xE60B1220),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = "Ready for setup",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Mount the phone securely, then start the drive.",
+                        color = Color(0xFFCBD5E1),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Button(
+                        onClick = onStartDrive,
+                        enabled = hasCameraPermission,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Start drive")
+                    }
+                    if (!hasCameraPermission) {
+                        FilledTonalButton(onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth()) {
+                            Text("Grant permissions")
+                        }
+                    }
                 }
             }
         }
@@ -520,7 +596,7 @@ private fun DrivingScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusPill(text = "Queue ready")
+                StatusPill(text = if (driveStarted) "Queue ready" else "Waiting")
                 StatusPill(text = scanningStatus)
                 Text(
                     text = connectivityStatus ?: apiBaseUrl.removeSuffix("/"),
@@ -756,6 +832,33 @@ private fun CameraPermissionPlaceholder(
 }
 
 @Composable
+private fun DriveSetupPlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFF101828)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Camera paused",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Scanning starts only after the drive begins.",
+                color = Color(0xFFCBD5E1),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
 fun CameraPreview(
     modifier: Modifier = Modifier,
     onStatusChange: (String) -> Unit = {},
@@ -777,6 +880,7 @@ fun CameraPreview(
     val processing = remember { AtomicBoolean(false) }
     val modelErrorReported = remember { AtomicBoolean(false) }
     val lastSavedAtMillis = remember { AtomicLong(0) }
+    val lastDetectedAtMillis = remember { AtomicLong(0) }
     val lastDetectionLogAtMillis = remember { AtomicLong(0) }
     val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
     var detectedBoundingBox by remember { mutableStateOf<BoundingBox?>(null) }
@@ -806,6 +910,8 @@ fun CameraPreview(
                                 it.surfaceProvider = previewView.surfaceProvider
                             }
                             val analysis = ImageAnalysis.Builder()
+                                .setResolutionSelector(ANALYSIS_RESOLUTION_SELECTOR)
+                                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                 .build()
                                 .also { imageAnalysis ->
@@ -842,13 +948,16 @@ fun CameraPreview(
                                         scope.launch {
                                             runCatching {
                                                 val detection = detector.detect(bitmap)
+                                                val now = System.currentTimeMillis()
                                                 if (detection == null) {
-                                                    detectedBoundingBox = null
+                                                    if (now - lastDetectedAtMillis.get() > DETECTION_BOX_HOLD_MS) {
+                                                        detectedBoundingBox = null
+                                                    }
                                                     return@runCatching "Scanning"
                                                 }
 
                                                 detectedBoundingBox = detection.boundingBox
-                                                val now = System.currentTimeMillis()
+                                                lastDetectedAtMillis.set(now)
                                                 if (now - lastDetectionLogAtMillis.get() >= DETECTION_LOG_COOLDOWN_MS) {
                                                     lastDetectionLogAtMillis.set(now)
                                                     currentOnLog("Pothole ${(detection.confidence * 100).toInt()}%")
@@ -857,25 +966,36 @@ fun CameraPreview(
                                                     return@runCatching "Detected"
                                                 }
 
-                                                val location = withContext(Dispatchers.IO) { locationProvider.currentLocation() }
-                                                    ?: return@runCatching "Location needed"
-
-                                                withContext(Dispatchers.IO) {
-                                                    repository.saveDetection(
-                                                        bitmap = bitmap,
-                                                        detection = detection,
-                                                        latitude = location.latitude,
-                                                        longitude = location.longitude,
-                                                        heading = location.heading,
-                                                        speed = location.speed,
-                                                    )
-                                                }
                                                 lastSavedAtMillis.set(now)
-                                                currentOnLog("Queued upload candidate")
-                                                "Queued"
+                                                scope.launch {
+                                                    val location = withContext(Dispatchers.IO) { locationProvider.currentLocation() }
+                                                    if (location == null) {
+                                                        currentOnStatusChange("Location needed")
+                                                        currentOnLog("Location unavailable")
+                                                        return@launch
+                                                    }
+
+                                                    runCatching {
+                                                        withContext(Dispatchers.IO) {
+                                                            repository.saveDetection(
+                                                                bitmap = bitmap,
+                                                                detection = detection,
+                                                                latitude = location.latitude,
+                                                                longitude = location.longitude,
+                                                                heading = location.heading,
+                                                                speed = location.speed,
+                                                            )
+                                                        }
+                                                    }.onSuccess {
+                                                        currentOnStatusChange("Queued")
+                                                        currentOnLog("Queued upload candidate")
+                                                    }.onFailure { error ->
+                                                        currentOnLog("Queue failed: ${error.javaClass.simpleName}")
+                                                    }
+                                                }
+                                                "Detected"
                                             }.onSuccess { status ->
                                                 currentOnStatusChange(status)
-                                                if (status == "Location needed") currentOnLog("Location unavailable")
                                             }.onFailure { error ->
                                                 detectedBoundingBox = null
                                                 currentOnStatusChange("Detection error")
@@ -903,8 +1023,17 @@ fun CameraPreview(
 }
 
 private const val DETECTION_SAVE_COOLDOWN_MS = 5_000L
+private const val DETECTION_BOX_HOLD_MS = 750L
 private const val DETECTION_LOG_COOLDOWN_MS = 1_000L
 private const val MAX_SCANNER_LOG_LINES = 6
+private val ANALYSIS_RESOLUTION_SELECTOR = ResolutionSelector.Builder()
+    .setResolutionStrategy(
+        ResolutionStrategy(
+            AndroidSize(640, 480),
+            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+        )
+    )
+    .build()
 
 @Composable
 private fun DetectionBoxOverlay(
@@ -1102,6 +1231,7 @@ private fun PotDroidUnpairedPreview() {
                 scanningStatus = "Model ready",
                 scannerLog = emptyList(),
                 hasCameraPermission = true,
+                driveStarted = false,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},
                 onPairingInputChange = {},
@@ -1110,6 +1240,8 @@ private fun PotDroidUnpairedPreview() {
                 onQrScanned = {},
                 onTestConnection = {},
                 onUnpair = {},
+                onStartDrive = {},
+                onStopDrive = {},
                 onRequestPermissions = {},
             )
         }
@@ -1130,6 +1262,7 @@ private fun PotDroidDrivingPreview() {
                 scanningStatus = "Model ready",
                 scannerLog = listOf("Model loaded", "Scanning"),
                 hasCameraPermission = true,
+                driveStarted = true,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},
                 onPairingInputChange = {},
@@ -1138,6 +1271,8 @@ private fun PotDroidDrivingPreview() {
                 onQrScanned = {},
                 onTestConnection = {},
                 onUnpair = {},
+                onStartDrive = {},
+                onStopDrive = {},
                 onRequestPermissions = {},
             )
         }

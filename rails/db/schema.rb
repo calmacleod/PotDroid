@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_134503) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_170000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -57,6 +57,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_134503) do
     t.datetime "created_at", null: false
     t.decimal "detector_confidence", precision: 5, scale: 4, null: false
     t.string "detector_model_version"
+    t.integer "duplicate_of_id"
     t.decimal "heading", precision: 6, scale: 2
     t.decimal "latitude", precision: 10, scale: 6, null: false
     t.decimal "longitude", precision: 10, scale: 6, null: false
@@ -68,6 +69,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_134503) do
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.index ["captured_at"], name: "index_candidate_potholes_on_captured_at"
+    t.index ["duplicate_of_id"], name: "index_candidate_potholes_on_duplicate_of_id"
     t.index ["reviewed_by_id"], name: "index_candidate_potholes_on_reviewed_by_id"
     t.index ["status"], name: "index_candidate_potholes_on_status"
     t.index ["user_id"], name: "index_candidate_potholes_on_user_id"
@@ -135,6 +137,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_134503) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "api_tokens", "users"
+  add_foreign_key "candidate_potholes", "candidate_potholes", column: "duplicate_of_id"
   add_foreign_key "candidate_potholes", "users"
   add_foreign_key "candidate_potholes", "users", column: "reviewed_by_id"
   add_foreign_key "city_submission_events", "city_submissions"

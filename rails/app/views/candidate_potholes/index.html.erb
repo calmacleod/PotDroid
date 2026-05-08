@@ -5,6 +5,7 @@
       <p class="page-kicker">Review detections uploaded from Android. Newest captures are first.</p>
     </div>
     <div class="button-group">
+      <%= link_to "Reconcile duplicates", candidate_pothole_reconciliations_path, class: "button" %>
       <%= link_to "API docs", "/api-docs", class: "button" %>
       <%= button_to "Pair Android app", pairing_sessions_path, class: "button primary" %>
     </div>
@@ -12,7 +13,7 @@
 
   <div class="toolbar">
     <nav class="segmented" aria-label="Candidate status filters">
-    <% [["All", nil], ["Pending", "pending_review"], ["Confirmed", "confirmed"], ["Rejected", "rejected"], ["Submitted", "submitted"], ["Closed", "closed"]].each do |label, status| %>
+    <% [["All", nil], ["Pending", "pending_review"], ["Confirmed", "confirmed"], ["Rejected", "rejected"], ["Submitted", "submitted"], ["Closed", "closed"], ["Duplicates", "duplicate"]].each do |label, status| %>
       <% active = @status == status || (@status.blank? && status.nil?) %>
         <% count = status ? @status_counts.fetch(status, 0) : @candidate_total %>
         <%= link_to candidate_potholes_path(status: status), class: "segment #{active ? "active" : ""}" do %>

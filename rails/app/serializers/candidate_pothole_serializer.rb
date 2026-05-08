@@ -17,6 +17,7 @@ class CandidatePotholeSerializer
           detector_confidence: @candidate_pothole.detector_confidence.to_f,
           detector_model_version: @candidate_pothole.detector_model_version,
           bounding_box: @candidate_pothole.bounding_box,
+          duplicate_of_id: @candidate_pothole.duplicate_of_id,
           captured_at: @candidate_pothole.captured_at&.iso8601,
           reviewed_at: @candidate_pothole.reviewed_at&.iso8601,
           submitted_at: @candidate_pothole.submitted_at&.iso8601,

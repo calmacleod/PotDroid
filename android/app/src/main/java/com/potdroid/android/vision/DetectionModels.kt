@@ -14,8 +14,7 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import kotlin.math.roundToInt
 
-private const val INPUT_MEAN = 127.5f
-private const val INPUT_STD = 127.5f
+private const val INPUT_SCALE = 255f
 
 data class BoundingBox(
     val left: Float,
@@ -57,7 +56,7 @@ class FakePotholeDetector(
 
 class TflitePotholeDetector(
     context: Context,
-    private val threshold: Float = 0.7f,
+    private val threshold: Float = DEFAULT_THRESHOLD,
 ) : PotholeDetector, AutoCloseable {
     private val interpreter = Interpreter(loadModelFile(context, MODEL_ASSET))
     private val inputTensor = interpreter.getInputTensor(0)
@@ -173,6 +172,7 @@ class TflitePotholeDetector(
     companion object {
         const val MODEL_ASSET = "pot_yolo_int8.tflite"
         const val MODEL_VERSION = "pot-yolo-int8-780aff5"
+        const val DEFAULT_THRESHOLD = 0.25f
         private const val RGB_CHANNELS = 3
         private const val YOLO_OUTPUT_COUNT = 1
         private val SSD_LABELS = listOf("null", "object", "Pothole")
@@ -275,7 +275,7 @@ private fun ByteBuffer.putColorChannel(
     quantization: Tensor.QuantizationParams,
 ) {
     when (dataType) {
-        DataType.FLOAT32 -> putFloat((value - INPUT_MEAN) / INPUT_STD)
+        DataType.FLOAT32 -> putFloat(value / INPUT_SCALE)
         DataType.UINT8, DataType.INT8 -> {
             val realValue = if (quantization.getScale() < NORMALIZED_INPUT_SCALE_CUTOFF) value / 255f else value.toFloat()
             val quantized = (realValue / quantization.getScale() + quantization.getZeroPoint()).roundToInt()

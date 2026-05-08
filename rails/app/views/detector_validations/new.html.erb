@@ -1,0 +1,69 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Detector validation lab</h1>
+      <p class="page-kicker">Upload a road image and run it through the local TFLite pothole detector.</p>
+    </div>
+    <%= link_to "Back to candidates", candidate_potholes_path, class: "button" %>
+  </div>
+
+  <div class="detector-lab-grid">
+    <aside class="side-stack">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Upload image</h2>
+        </div>
+        <div class="panel-body">
+          <%= form_with scope: :detector_validation, url: detector_validation_path, multipart: true, data: { turbo: false }, class: "form-stack" do |form| %>
+            <div class="field">
+              <%= form.label :image, "Image", class: "label" %>
+              <%= form.file_field :image, accept: "image/png,image/jpeg,image/webp", class: "input" %>
+            </div>
+            <div class="field">
+              <%= form.label :threshold, "Threshold", class: "label" %>
+              <%= form.number_field :threshold, value: params.dig(:detector_validation, :threshold).presence || PotholeDetector::TfliteValidator::DEFAULT_THRESHOLD, min: 0, max: 1, step: 0.05, class: "input" %>
+            </div>
+            <%= form.submit "Validate image", class: "button primary" %>
+          <% end %>
+        </div>
+      </section>
+
+      <% if @detector_validation_result.present? || @detector_validation_error.present? %>
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Result</h2>
+            <% if @detector_validation_result.present? %>
+              <span class="badge status-<%= @detector_validation_result["detected"] ? "confirmed" : "rejected" %>"><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></span>
+            <% else %>
+              <span class="badge status-failed">Failed</span>
+            <% end %>
+          </div>
+          <div class="panel-body">
+            <% if @detector_validation_error.present? %>
+              <p class="flash alert"><%= @detector_validation_error %></p>
+            <% else %>
+              <dl class="definition-list">
+                <div class="definition-row"><dt>Result</dt><dd><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></dd></div>
+                <div class="definition-row"><dt>Confidence</dt><dd class="metric"><%= @detector_validation_result["confidence"].present? ? number_to_percentage(@detector_validation_result["confidence"].to_f * 100, precision: 1) : "none" %></dd></div>
+                <div class="definition-row"><dt>Threshold</dt><dd class="metric"><%= number_to_percentage(@detector_validation_result["threshold"].to_f * 100, precision: 1) %></dd></div>
+                <div class="definition-row"><dt>Model</dt><dd class="mono"><%= @detector_validation_result["model_version"].presence || "unknown" %></dd></div>
+                <div class="definition-row"><dt>Bounding box</dt><dd class="mono"><%= @detector_validation_result["bounding_box"].presence || "none" %></dd></div>
+              </dl>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
+    </aside>
+
+    <div class="image-stage">
+      <% if @detector_validation_image_data_url.present? %>
+        <div class="detection-image-frame">
+          <%= image_tag @detector_validation_image_data_url, class: "hero-image", alt: "Uploaded validation image" %>
+          <%= detector_validation_bounding_box(@detector_validation_result) %>
+        </div>
+      <% else %>
+        <div class="empty-state">No validation image uploaded.</div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -73,3 +73,34 @@ Multipart field names:
 - `candidate_pothole[bounding_box][bottom]`
 
 Successful responses return `201 Created` with the candidate id, status, metadata, image URL, and city submission state when present.
+
+## Validate Image Against Local Detector
+
+`POST /api/v1/detector_validation`
+
+This endpoint is intended for development and review workflows on a machine that can run the local TFLite detector. It does not create a candidate pothole; it only reports whether the bundled detector would catch the uploaded image.
+
+Multipart field names:
+
+- `image`
+- `threshold` optional, defaults to `0.25`
+
+Successful responses return `200 OK`:
+
+```json
+{
+  "detected": true,
+  "confidence": 0.82,
+  "threshold": 0.25,
+  "model_version": "pot-yolo-int8-780aff5",
+  "bounding_box": {
+    "left": 0.1,
+    "top": 0.2,
+    "right": 0.4,
+    "bottom": 0.5
+  },
+  "detections": []
+}
+```
+
+Rails executes `rails/lib/pothole_detector/tflite_runner.py` with the Android model asset. Run `scripts/setup-detector` to install the optional Python dependencies into `rails/tmp/detector-venv`, or set `POTDROID_DETECTOR_PYTHON` when Rails should use a specific Python or virtualenv.

@@ -16,6 +16,7 @@
         <div class="detection-image-frame">
           <%= image_tag @candidate_pothole.image, class: "hero-image" %>
           <%= candidate_bounding_box(@candidate_pothole) %>
+          <%= detector_validation_bounding_box(@detector_validation_result) %>
         </div>
       <% else %>
         <div class="empty-state">No image attached.</div>
@@ -32,6 +33,7 @@
             <%= button_to "Confirm", confirm_candidate_pothole_path(@candidate_pothole), method: :patch, class: "button success" %>
             <%= button_to "Reject", reject_candidate_pothole_path(@candidate_pothole), method: :patch, class: "button danger" %>
             <%= button_to "Submit", submit_candidate_pothole_path(@candidate_pothole), class: "button primary" %>
+            <%= button_to "Validate detector", validate_detector_candidate_pothole_path(@candidate_pothole), class: "button" %>
           </div>
         </div>
       </section>
@@ -48,12 +50,41 @@
           <div class="definition-row"><dt>Captured</dt><dd class="mono"><%= l @candidate_pothole.captured_at, format: :short %></dd></div>
           <div class="definition-row"><dt>Coordinates</dt><dd class="mono"><%= @candidate_pothole.latitude %>, <%= @candidate_pothole.longitude %></dd></div>
           <div class="definition-row"><dt>Bounding box</dt><dd class="mono"><%= @candidate_pothole.bounding_box.presence || "none" %></dd></div>
+          <% if @candidate_pothole.duplicate_of.present? %>
+            <div class="definition-row"><dt>Duplicate of</dt><dd><%= link_to "Candidate ##{@candidate_pothole.duplicate_of_id}", @candidate_pothole.duplicate_of, class: "link" %></dd></div>
+          <% end %>
         </dl>
         <div class="panel-actions">
           <%= link_to "Open map", "https://www.google.com/maps/search/?api=1&query=#{@candidate_pothole.latitude},#{@candidate_pothole.longitude}", target: "_blank", rel: "noopener", class: "button" %>
         </div>
         </div>
       </section>
+
+      <% if @detector_validation_result.present? || @detector_validation_error.present? %>
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Detector validation</h2>
+            <% if @detector_validation_result.present? %>
+              <span class="badge status-<%= @detector_validation_result["detected"] ? "confirmed" : "rejected" %>"><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></span>
+            <% else %>
+              <span class="badge status-failed">Failed</span>
+            <% end %>
+          </div>
+          <div class="panel-body">
+            <% if @detector_validation_error.present? %>
+              <p class="flash alert"><%= @detector_validation_error %></p>
+            <% else %>
+              <dl class="definition-list">
+                <div class="definition-row"><dt>Result</dt><dd><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></dd></div>
+                <div class="definition-row"><dt>Confidence</dt><dd class="metric"><%= @detector_validation_result["confidence"].present? ? number_to_percentage(@detector_validation_result["confidence"].to_f * 100, precision: 1) : "none" %></dd></div>
+                <div class="definition-row"><dt>Threshold</dt><dd class="metric"><%= number_to_percentage(@detector_validation_result["threshold"].to_f * 100, precision: 1) %></dd></div>
+                <div class="definition-row"><dt>Model</dt><dd class="mono"><%= @detector_validation_result["model_version"].presence || "unknown" %></dd></div>
+                <div class="definition-row"><dt>Bounding box</dt><dd class="mono"><%= @detector_validation_result["bounding_box"].presence || "none" %></dd></div>
+              </dl>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
 
       <section class="panel">
         <div class="panel-header">

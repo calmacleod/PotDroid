@@ -8,14 +8,18 @@ Rails.application.routes.draw do
       patch :confirm
       patch :reject
       post :submit
+      post :validate_detector
     end
   end
+  resources :candidate_pothole_reconciliations, only: %i[ index create ]
+  resource :detector_validation, only: %i[ new create ]
   resources :api_tokens, only: %i[ create ]
   resources :pairing_sessions, only: %i[ show create ]
 
   namespace :api do
     namespace :v1 do
       resources :candidate_potholes, only: %i[ create show ]
+      resource :detector_validation, only: %i[ create ]
       resource :pairing, only: %i[ create ]
     end
   end
