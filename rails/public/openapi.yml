@@ -1,0 +1,298 @@
+openapi: 3.1.0
+info:
+  title: PotDroid API
+  version: 1.0.0
+  description: API used by the PotDroid Android app to pair devices and submit candidate potholes for review.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: Pairing
+  - name: Candidate Potholes
+paths:
+  /api/v1/pairing:
+    post:
+      tags:
+        - Pairing
+      summary: Claim a one-time pairing code
+      description: Exchanges a QR-code pairing code from the Rails UI for a long-lived Android bearer token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pairing
+              properties:
+                pairing:
+                  type: object
+                  required:
+                    - code
+                  properties:
+                    code:
+                      type: string
+                      example: ABCD-EFGH-JK23
+                    device_name:
+                      type: string
+                      example: Pixel 9 Pro
+      responses:
+        "201":
+          description: Pairing code claimed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairingResponse"
+        "422":
+          description: Pairing code is invalid, expired, or already used.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/candidate_potholes:
+    post:
+      tags:
+        - Candidate Potholes
+      summary: Submit a candidate pothole upload
+      description: Accepts a compressed road image plus detector and location metadata from Android.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - candidate_pothole[image]
+                - candidate_pothole[latitude]
+                - candidate_pothole[longitude]
+                - candidate_pothole[detector_confidence]
+                - candidate_pothole[detector_model_version]
+                - candidate_pothole[captured_at]
+              properties:
+                candidate_pothole[image]:
+                  type: string
+                  format: binary
+                candidate_pothole[latitude]:
+                  type: number
+                  format: double
+                  example: 45.4215
+                candidate_pothole[longitude]:
+                  type: number
+                  format: double
+                  example: -75.6972
+                candidate_pothole[heading]:
+                  type: number
+                  format: double
+                  nullable: true
+                  example: 180.5
+                candidate_pothole[speed]:
+                  type: number
+                  format: double
+                  nullable: true
+                  example: 12.3
+                candidate_pothole[detector_confidence]:
+                  type: number
+                  format: double
+                  minimum: 0
+                  maximum: 1
+                  example: 0.88
+                candidate_pothole[detector_model_version]:
+                  type: string
+                  example: fake-detector-v1
+                candidate_pothole[captured_at]:
+                  type: string
+                  format: date-time
+                  example: "2026-05-08T12:00:00Z"
+                candidate_pothole[bounding_box][left]:
+                  type: number
+                  format: double
+                  example: 0.1
+                candidate_pothole[bounding_box][top]:
+                  type: number
+                  format: double
+                  example: 0.2
+                candidate_pothole[bounding_box][right]:
+                  type: number
+                  format: double
+                  example: 0.3
+                candidate_pothole[bounding_box][bottom]:
+                  type: number
+                  format: double
+                  example: 0.4
+      responses:
+        "201":
+          description: Candidate pothole accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidatePotholeResponse"
+        "400":
+          description: Required parameter is missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer token is missing or invalid.
+        "422":
+          description: Metadata validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+  /api/v1/candidate_potholes/{id}:
+    get:
+      tags:
+        - Candidate Potholes
+      summary: Fetch candidate pothole status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Candidate pothole status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidatePotholeResponse"
+        "401":
+          description: Bearer token is missing or invalid.
+        "404":
+          description: Candidate pothole was not found for the authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: PotDroid API token
+  schemas:
+    PairingResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            type:
+              type: string
+              example: pairing
+            attributes:
+              type: object
+              properties:
+                api_token:
+                  type: string
+                  example: pd_example_token
+                token_type:
+                  type: string
+                  example: Bearer
+                long_lived:
+                  type: boolean
+                  example: true
+                user_email:
+                  type: string
+                  format: email
+                  example: driver@example.com
+    CandidatePotholeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 42
+            type:
+              type: string
+              example: candidate_pothole
+            attributes:
+              $ref: "#/components/schemas/CandidatePotholeAttributes"
+    CandidatePotholeAttributes:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - pending_review
+            - confirmed
+            - rejected
+            - submitted
+            - closed
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        detector_confidence:
+          type: number
+          format: double
+        detector_model_version:
+          type: string
+        bounding_box:
+          type: object
+          additionalProperties: true
+        captured_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        reviewed_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        submitted_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        image_url:
+          type:
+            - string
+            - "null"
+        city_submission:
+          anyOf:
+            - $ref: "#/components/schemas/CitySubmission"
+            - type: "null"
+    CitySubmission:
+      type: object
+      properties:
+        status:
+          type: string
+        connector:
+          type: string
+          example: ottawa_open311
+        external_request_id:
+          type:
+            - string
+            - "null"
+        external_status:
+          type:
+            - string
+            - "null"
+        last_checked_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+    ValidationErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: object
+          additionalProperties: true

@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  mount Scalar::UI, at: "/api-docs"
+
   resource :session
   resources :passwords, param: :token
   resources :candidate_potholes, only: %i[ index show ] do

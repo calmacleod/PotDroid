@@ -3,7 +3,7 @@ class CandidatePothole < ApplicationRecord
   belongs_to :reviewed_by, class_name: "User", optional: true
   has_one :city_submission, dependent: :destroy
   has_one_attached :image do |attachable|
-    attachable.variant :thumb, resize_to_limit: [320, 240]
+    attachable.variant :thumb, resize_to_limit: [ 320, 240 ]
   end
 
   enum :status, {

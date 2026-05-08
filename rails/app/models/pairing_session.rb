@@ -19,7 +19,7 @@ class PairingSession < ApplicationRecord
       expires_at: EXPIRES_IN.from_now
     )
 
-    [pairing_session, raw_code]
+    [ pairing_session, raw_code ]
   end
 
   def self.claim!(raw_code:, device_name:)
@@ -37,7 +37,7 @@ class PairingSession < ApplicationRecord
         claimed_at: Time.current
       )
 
-      [pairing_session, raw_token]
+      [ pairing_session, raw_token ]
     end
   end
 

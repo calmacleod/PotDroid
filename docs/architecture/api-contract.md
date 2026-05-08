@@ -1,5 +1,11 @@
 # API Contract
 
+The same contract is available as a self-hosted Scalar UI when Rails is running:
+
+```text
+http://localhost:3000/api-docs
+```
+
 ## Authentication
 
 Android sends a bearer token:

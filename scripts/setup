@@ -8,6 +8,12 @@ mise exec ruby@4.0.1 -- bin/rails db:setup
 cat <<MSG
 
 Rails is ready.
-Android requires Gradle/Android Studio. If adb is not on PATH, add:
-  export PATH="\$HOME/Library/Android/sdk/platform-tools:\$PATH"
+For the full dev environment, install Nix + devenv, then run:
+  devenv shell
+
+For automatic shell activation:
+  direnv allow
+
+The devenv shell provides cloudflared, Android platform-tools, Ruby, JDK 17,
+and sets GRADLE_USER_HOME so Android commands do not need a prefix.
 MSG

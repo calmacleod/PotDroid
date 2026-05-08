@@ -1,4 +1,6 @@
 .DS_Store
+.devenv/
+.direnv/
 
 rails/.bundle/
 rails/coverage/

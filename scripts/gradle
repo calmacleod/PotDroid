@@ -8,12 +8,5 @@ export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$ROOT/android/.gradle}"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
-cd "$ROOT/rails"
-mise exec ruby@4.0.1 -- bundle exec rspec
-
-if [ -x "$ROOT/android/gradlew" ]; then
-  cd "$ROOT/android"
-  ./gradlew testDebugUnitTest
-else
-  echo "Skipping Android tests: android/gradlew is not present and gradle is not on PATH."
-fi
+cd "$ROOT/android"
+exec ./gradlew "$@"

@@ -17,7 +17,7 @@ class ApiToken < ApplicationRecord
       token_prefix: raw_token.first(TOKEN_PREFIX_LENGTH)
     )
 
-    [api_token, raw_token]
+    [ api_token, raw_token ]
   end
 
   def self.authenticate(raw_token)

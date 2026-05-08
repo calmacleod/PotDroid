@@ -14,6 +14,24 @@ Create an Android API token from the Rails UI after signing in. Seed credentials
 - email: `driver@example.com`
 - password: `password123`
 
+## devenv
+
+`devenv.sh` is a good fit for this monorepo because it can provide the missing command-line tools without replacing Android Studio. From the repo root:
+
+```sh
+devenv shell
+```
+
+The checked-in `devenv.nix` provides `cloudflared`, Android platform tools, JDK 17, `mise`, SQLite, and shared environment variables. It uses the Android Studio SDK at `~/Library/Android/sdk` by default and stores Gradle caches under `android/.gradle`.
+
+For automatic shell activation, use `devenv hook` with your shell. If you prefer `direnv`, install it and run:
+
+```sh
+direnv allow
+```
+
+If `devenv` is not installed, `.envrc` falls back to the same Android environment variables when loaded by `direnv`.
+
 ## Cloudflare Tunnel
 
 Install `cloudflared`, then run:
@@ -33,3 +51,19 @@ cd android
 ./gradlew testDebugUnitTest
 ./gradlew connectedDebugAndroidTest
 ```
+
+From the repo root, use this wrapper when your shell has not loaded `.envrc`:
+
+```sh
+scripts/gradle testDebugUnitTest
+```
+
+## API Documentation
+
+The Rails app mounts self-hosted Scalar documentation at:
+
+```sh
+http://localhost:3000/api-docs
+```
+
+The OpenAPI document is served from `rails/public/openapi.yml`, and the Scalar browser bundle is served from `rails/public/scalar-api-reference.js`.
