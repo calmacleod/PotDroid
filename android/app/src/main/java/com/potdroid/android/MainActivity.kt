@@ -1,6 +1,8 @@
 package com.potdroid.android
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -10,10 +12,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview as CameraXPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -56,10 +60,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -74,12 +82,21 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import com.potdroid.android.data.DebugSettings
+import com.potdroid.android.data.CandidateRepository
+import com.potdroid.android.data.LocationProvider
+import com.potdroid.android.data.PotDroidDatabase
 import com.potdroid.android.network.ApiClient
 import com.potdroid.android.network.PairingParser
 import com.potdroid.android.network.PairingPayload
 import com.potdroid.android.network.PairingRequest
+import com.potdroid.android.vision.BoundingBox
+import com.potdroid.android.vision.TflitePotholeDetector
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,6 +121,8 @@ fun PotDroidApp(initialPairingInput: String = "") {
     var pairingInput by remember { mutableStateOf(initialPairingInput) }
     var pairingStatus by remember { mutableStateOf<String?>(null) }
     var connectivityStatus by remember { mutableStateOf<String?>(null) }
+    var scanningStatus by remember { mutableStateOf("Model ready") }
+    var scannerLog by remember { mutableStateOf<List<String>>(emptyList()) }
     var hasCameraPermission by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -114,6 +133,11 @@ fun PotDroidApp(initialPairingInput: String = "") {
     fun saveConnection() {
         settings.apiBaseUrl = apiBaseUrl
         settings.apiToken = apiToken
+    }
+
+    fun appendScannerLog(message: String) {
+        if (!BuildConfig.DEBUG || scannerLog.lastOrNull() == message) return
+        scannerLog = (scannerLog + message).takeLast(MAX_SCANNER_LOG_LINES)
     }
 
     fun pairWith(input: String) {
@@ -187,6 +211,8 @@ fun PotDroidApp(initialPairingInput: String = "") {
         pairingInput = pairingInput,
         pairingStatus = pairingStatus,
         connectivityStatus = connectivityStatus,
+        scanningStatus = scanningStatus,
+        scannerLog = scannerLog,
         hasCameraPermission = hasCameraPermission,
         onApiBaseUrlChange = { apiBaseUrl = it },
         onApiTokenChange = { apiToken = it },
@@ -209,7 +235,13 @@ fun PotDroidApp(initialPairingInput: String = "") {
         onRequestPermissions = {
             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
         },
-        drivingCameraContent = { modifier -> CameraPreview(modifier = modifier) },
+        drivingCameraContent = { modifier ->
+            CameraPreview(
+                modifier = modifier,
+                onStatusChange = { scanningStatus = it },
+                onLog = { appendScannerLog(it) },
+            )
+        },
         qrScannerContent = { modifier, onQrScanned ->
             QrScannerPreview(modifier = modifier, onQrScanned = onQrScanned)
         },
@@ -223,6 +255,8 @@ fun PotDroidScreen(
     pairingInput: String,
     pairingStatus: String?,
     connectivityStatus: String?,
+    scanningStatus: String,
+    scannerLog: List<String>,
     hasCameraPermission: Boolean,
     onApiBaseUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
@@ -262,6 +296,8 @@ fun PotDroidScreen(
             apiBaseUrl = apiBaseUrl,
             apiToken = apiToken,
             connectivityStatus = connectivityStatus,
+            scanningStatus = scanningStatus,
+            scannerLog = scannerLog,
             hasCameraPermission = hasCameraPermission,
             onApiBaseUrlChange = onApiBaseUrlChange,
             onApiTokenChange = onApiTokenChange,
@@ -390,6 +426,8 @@ private fun DrivingScreen(
     apiBaseUrl: String,
     apiToken: String,
     connectivityStatus: String?,
+    scanningStatus: String,
+    scannerLog: List<String>,
     hasCameraPermission: Boolean,
     onApiBaseUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
@@ -483,12 +521,45 @@ private fun DrivingScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 StatusPill(text = "Queue ready")
+                StatusPill(text = scanningStatus)
                 Text(
                     text = connectivityStatus ?: apiBaseUrl.removeSuffix("/"),
                     color = Color(0xFFCBD5E1),
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                 )
+            }
+        }
+
+        if (BuildConfig.DEBUG && scannerLog.isNotEmpty()) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, end = 12.dp, bottom = 64.dp)
+                    .fillMaxWidth(0.82f),
+                color = Color(0xD90B1220),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = "Detector log",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF93C5FD),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    scannerLog.forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFE2E8F0),
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
 
@@ -685,33 +756,190 @@ private fun CameraPermissionPlaceholder(
 }
 
 @Composable
-fun CameraPreview(modifier: Modifier = Modifier) {
+fun CameraPreview(
+    modifier: Modifier = Modifier,
+    onStatusChange: (String) -> Unit = {},
+    onLog: (String) -> Unit = {},
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val currentOnStatusChange by rememberUpdatedState(onStatusChange)
+    val currentOnLog by rememberUpdatedState(onLog)
+    val detectorResult = remember(context) { runCatching { TflitePotholeDetector(context.applicationContext) } }
+    val repository = remember(context) {
+        CandidateRepository(
+            context.applicationContext,
+            PotDroidDatabase.get(context).candidatePotholeDao(),
+        )
+    }
+    val locationProvider = remember(context) { LocationProvider(context.applicationContext) }
+    val processing = remember { AtomicBoolean(false) }
+    val modelErrorReported = remember { AtomicBoolean(false) }
+    val lastSavedAtMillis = remember { AtomicLong(0) }
+    val lastDetectionLogAtMillis = remember { AtomicLong(0) }
+    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
+    var detectedBoundingBox by remember { mutableStateOf<BoundingBox?>(null) }
 
-    AndroidView(
-        modifier = modifier,
-        factory = { viewContext ->
-            PreviewView(viewContext).also { previewView ->
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
-                cameraProviderFuture.addListener(
-                    {
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = CameraXPreview.Builder().build().also {
-                            it.surfaceProvider = previewView.surfaceProvider
-                        }
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                        )
-                    },
-                    ContextCompat.getMainExecutor(context),
-                )
-            }
-        },
-    )
+    DisposableEffect(detectorResult, analyzerExecutor) {
+        if (detectorResult.isSuccess) {
+            currentOnLog("Model loaded")
+        } else {
+            currentOnLog("Model failed: ${detectorResult.exceptionOrNull()?.javaClass?.simpleName ?: "unknown"}")
+        }
+        onDispose {
+            detectorResult.getOrNull()?.close()
+            analyzerExecutor.shutdown()
+        }
+    }
+
+    Box(modifier = modifier) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { viewContext ->
+                PreviewView(viewContext).also { previewView ->
+                    val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
+                    cameraProviderFuture.addListener(
+                        {
+                            val cameraProvider = cameraProviderFuture.get()
+                            val preview = CameraXPreview.Builder().build().also {
+                                it.surfaceProvider = previewView.surfaceProvider
+                            }
+                            val analysis = ImageAnalysis.Builder()
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
+                                .also { imageAnalysis ->
+                                    imageAnalysis.setAnalyzer(analyzerExecutor) { imageProxy ->
+                                        val detector = detectorResult.getOrNull()
+                                        if (detector == null) {
+                                            if (modelErrorReported.compareAndSet(false, true)) {
+                                                scope.launch {
+                                                    currentOnStatusChange("Model error")
+                                                    currentOnLog("Model unavailable")
+                                                }
+                                            }
+                                            imageProxy.close()
+                                            return@setAnalyzer
+                                        }
+
+                                        if (!processing.compareAndSet(false, true)) {
+                                            imageProxy.close()
+                                            return@setAnalyzer
+                                        }
+
+                                        val bitmap = runCatching { imageProxy.toUprightBitmap() }
+                                            .also { imageProxy.close() }
+                                            .getOrElse {
+                                                processing.set(false)
+                                                scope.launch {
+                                                    detectedBoundingBox = null
+                                                    currentOnStatusChange("Frame error")
+                                                    currentOnLog("Frame conversion failed")
+                                                }
+                                                return@setAnalyzer
+                                            }
+
+                                        scope.launch {
+                                            runCatching {
+                                                val detection = detector.detect(bitmap)
+                                                if (detection == null) {
+                                                    detectedBoundingBox = null
+                                                    return@runCatching "Scanning"
+                                                }
+
+                                                detectedBoundingBox = detection.boundingBox
+                                                val now = System.currentTimeMillis()
+                                                if (now - lastDetectionLogAtMillis.get() >= DETECTION_LOG_COOLDOWN_MS) {
+                                                    lastDetectionLogAtMillis.set(now)
+                                                    currentOnLog("Pothole ${(detection.confidence * 100).toInt()}%")
+                                                }
+                                                if (now - lastSavedAtMillis.get() < DETECTION_SAVE_COOLDOWN_MS) {
+                                                    return@runCatching "Detected"
+                                                }
+
+                                                val location = withContext(Dispatchers.IO) { locationProvider.currentLocation() }
+                                                    ?: return@runCatching "Location needed"
+
+                                                withContext(Dispatchers.IO) {
+                                                    repository.saveDetection(
+                                                        bitmap = bitmap,
+                                                        detection = detection,
+                                                        latitude = location.latitude,
+                                                        longitude = location.longitude,
+                                                        heading = location.heading,
+                                                        speed = location.speed,
+                                                    )
+                                                }
+                                                lastSavedAtMillis.set(now)
+                                                currentOnLog("Queued upload candidate")
+                                                "Queued"
+                                            }.onSuccess { status ->
+                                                currentOnStatusChange(status)
+                                                if (status == "Location needed") currentOnLog("Location unavailable")
+                                            }.onFailure { error ->
+                                                detectedBoundingBox = null
+                                                currentOnStatusChange("Detection error")
+                                                currentOnLog("Detection failed: ${error.javaClass.simpleName}")
+                                            }
+                                            processing.set(false)
+                                        }
+                                    }
+                                }
+                            cameraProvider.unbindAll()
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                                analysis,
+                            )
+                        },
+                        ContextCompat.getMainExecutor(context),
+                    )
+                }
+            },
+        )
+        DetectionBoxOverlay(boundingBox = detectedBoundingBox, modifier = Modifier.fillMaxSize())
+    }
+}
+
+private const val DETECTION_SAVE_COOLDOWN_MS = 5_000L
+private const val DETECTION_LOG_COOLDOWN_MS = 1_000L
+private const val MAX_SCANNER_LOG_LINES = 6
+
+@Composable
+private fun DetectionBoxOverlay(
+    boundingBox: BoundingBox?,
+    modifier: Modifier = Modifier,
+) {
+    if (boundingBox == null) return
+
+    Canvas(modifier = modifier) {
+        val left = boundingBox.left * size.width
+        val top = boundingBox.top * size.height
+        val right = boundingBox.right * size.width
+        val bottom = boundingBox.bottom * size.height
+
+        drawRect(
+            color = Color(0x3322C55E),
+            topLeft = Offset(left, top),
+            size = Size(right - left, bottom - top),
+        )
+        drawRect(
+            color = Color(0xFF22C55E),
+            topLeft = Offset(left, top),
+            size = Size(right - left, bottom - top),
+            style = Stroke(width = 3.dp.toPx()),
+        )
+    }
+}
+
+private fun ImageProxy.toUprightBitmap(): Bitmap {
+    val bitmap = toBitmap()
+    val rotationDegrees = imageInfo.rotationDegrees
+    if (rotationDegrees == 0) return bitmap
+
+    val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
@@ -871,6 +1099,8 @@ private fun PotDroidUnpairedPreview() {
                 pairingInput = "potdroid://pair?u=https%3A%2F%2Fexample.trycloudflare.com&c=ABCD-EFGH-JK23",
                 pairingStatus = null,
                 connectivityStatus = "Connection OK",
+                scanningStatus = "Model ready",
+                scannerLog = emptyList(),
                 hasCameraPermission = true,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},
@@ -897,6 +1127,8 @@ private fun PotDroidDrivingPreview() {
                 pairingInput = "",
                 pairingStatus = "Paired. Long-lived token saved.",
                 connectivityStatus = null,
+                scanningStatus = "Model ready",
+                scannerLog = listOf("Model loaded", "Scanning"),
                 hasCameraPermission = true,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},

@@ -27,6 +27,10 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        noCompress += "tflite"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -73,7 +77,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
-    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+    implementation("com.google.ai.edge.litert:litert:1.4.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")

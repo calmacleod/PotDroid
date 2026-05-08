@@ -44,7 +44,10 @@
             <td>
               <%= link_to candidate do %>
                 <% if candidate.image.attached? %>
-                  <%= image_tag candidate.image.variant(:thumb), class: "thumbnail" %>
+                  <span class="detection-thumb-frame">
+                    <%= image_tag candidate.image.variant(:thumb), class: "thumbnail" %>
+                    <%= candidate_bounding_box(candidate) %>
+                  </span>
                 <% else %>
                   <div class="placeholder-thumb"></div>
                 <% end %>

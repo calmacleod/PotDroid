@@ -13,7 +13,10 @@
   <div class="detail-grid">
     <div class="image-stage">
       <% if @candidate_pothole.image.attached? %>
-        <%= image_tag @candidate_pothole.image, class: "hero-image" %>
+        <div class="detection-image-frame">
+          <%= image_tag @candidate_pothole.image, class: "hero-image" %>
+          <%= candidate_bounding_box(@candidate_pothole) %>
+        </div>
       <% else %>
         <div class="empty-state">No image attached.</div>
       <% end %>

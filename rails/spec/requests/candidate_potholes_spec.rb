@@ -18,6 +18,17 @@ RSpec.describe "Candidate pothole review", type: :request do
     expect(response.body).to include("fake-detector-v1").or include("91.0%")
   end
 
+  it "shows the stored bounding box on the candidate image" do
+    get candidate_pothole_path(candidate)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("detection-box")
+    expect(response.body).to include("--box-left: 10.0%")
+    expect(response.body).to include("--box-top: 20.0%")
+    expect(response.body).to include("--box-width: 30.0%")
+    expect(response.body).to include("--box-height: 30.0%")
+  end
+
   it "shows when an Android device is paired" do
     create(
       :pairing_session,
