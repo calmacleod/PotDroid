@@ -4,6 +4,8 @@ class CandidatePotholesController < ApplicationController
   def index
     @status = params[:status]
     @candidate_potholes = Current.user.candidate_potholes.with_attached_image.with_status(@status).recent_first
+    @status_counts = Current.user.candidate_potholes.group(:status).count
+    @candidate_total = @status_counts.values.sum
   end
 
   def show

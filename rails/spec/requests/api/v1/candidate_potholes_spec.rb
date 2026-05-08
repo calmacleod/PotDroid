@@ -5,7 +5,7 @@ RSpec.describe "API candidate potholes", type: :request do
   let(:token_pair) { ApiToken.issue!(user: user, name: "Android") }
   let(:raw_token) { token_pair.last }
   let(:headers) { { "Authorization" => "Bearer #{raw_token}" } }
-  let(:image) { fixture_file_upload("pothole.jpg", "image/jpeg") }
+  let(:image) { fixture_file_upload("pothole.png", "image/png") }
 
   describe "POST /api/v1/candidate_potholes" do
     it "creates an authenticated candidate pothole upload" do

@@ -24,8 +24,53 @@
   </head>
 
   <body>
-    <main class="container mx-auto mt-28 px-5 flex">
-      <%= yield %>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <%= link_to root_path, class: "brand" do %>
+            <span class="brand-mark">PD</span>
+            <span class="brand-text">
+              <span class="brand-title">PotDroid</span>
+              <span class="brand-subtitle">Road defect operations</span>
+            </span>
+          <% end %>
+
+          <% if authenticated? %>
+            <nav class="topbar-actions" aria-label="Primary">
+              <%= link_to "Candidates", candidate_potholes_path, class: "button ghost" %>
+              <%= button_to "Pair Android app", pairing_sessions_path, class: "button primary" %>
+              <%= button_to "Sign out", session_path, method: :delete, class: "button" %>
+            </nav>
+          <% end %>
+        </div>
+      </header>
+
+      <% if Rails.env.development? %>
+        <aside class="dev-banner" aria-label="Development seed credentials">
+          <div class="dev-banner-inner">
+            <span>Development seed login</span>
+            <code><%= DevSeedCredentials::EMAIL %></code>
+            <span>/</span>
+            <code><%= DevSeedCredentials::PASSWORD %></code>
+          </div>
+        </aside>
+      <% end %>
+
+      <main class="app-main">
+        <% if alert = flash[:alert] %>
+          <div class="flash-stack">
+            <p class="flash alert" id="alert"><%= alert %></p>
+          </div>
+        <% end %>
+
+        <% if notice = flash[:notice] %>
+          <div class="flash-stack">
+            <p class="flash notice" id="notice"><%= notice %></p>
+          </div>
+        <% end %>
+
+        <%= yield %>
     </main>
+    </div>
   </body>
 </html>

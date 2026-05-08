@@ -9,7 +9,13 @@ mise exec ruby@4.0.1 -- bin/rails db:setup
 mise exec ruby@4.0.1 -- bin/rails server
 ```
 
-Create an Android API token from the Rails UI after signing in. Seed credentials are:
+Reset development data from the monorepo root:
+
+```sh
+scripts/reset-dev-db
+```
+
+Development seeds use Rails-native `db/seeds.rb` with deterministic `faker` values and stable upserts. Seed credentials are also shown in a development-only banner in the Rails UI:
 
 - email: `driver@example.com`
 - password: `password123`

@@ -35,5 +35,6 @@
     test.exec = "scripts/test";
     rails.exec = "scripts/dev";
     tunnel.exec = "scripts/tunnel";
+    console.exec = "rails/bin/rails console";
   };
 }

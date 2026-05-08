@@ -16,6 +16,17 @@ scripts/setup
 scripts/dev
 ```
 
+To rebuild the Rails development database with deterministic seed data:
+
+```sh
+scripts/reset-dev-db
+```
+
+Seed login:
+
+- email: `driver@example.com`
+- password: `password123`
+
 In another terminal, expose Rails to a physical Android device:
 
 ```sh

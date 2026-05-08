@@ -13,9 +13,9 @@ FactoryBot.define do
 
     after(:build) do |candidate|
       candidate.image.attach(
-        io: File.open(Rails.root.join("spec/fixtures/files/pothole.jpg")),
-        filename: "pothole.jpg",
-        content_type: "image/jpeg"
+        io: File.open(Rails.root.join("spec/fixtures/files/pothole.png")),
+        filename: "pothole.png",
+        content_type: "image/png"
       )
     end
   end
