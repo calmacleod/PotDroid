@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "cloudflared is not installed or not on PATH."
+  echo "Install it, then rerun: cloudflared tunnel --url http://localhost:3000"
+  exit 1
+fi
+
+exec cloudflared tunnel --url http://localhost:3000

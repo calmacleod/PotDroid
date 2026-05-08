@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/../rails"
+echo "Rails API: http://localhost:3000"
+echo "Run scripts/tunnel in another terminal for physical Android device testing."
+exec mise exec ruby@4.0.1 -- bin/rails server

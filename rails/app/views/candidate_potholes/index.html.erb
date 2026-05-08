@@ -1,0 +1,55 @@
+<div class="mx-auto max-w-6xl px-4 py-8">
+  <div class="mb-6 flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight text-gray-950">Candidate potholes</h1>
+      <p class="mt-1 text-sm text-gray-600">Review detections uploaded from the Android app.</p>
+    </div>
+    <%= button_to "Create Android token", api_tokens_path, params: { api_token: { name: "Android device" } }, class: "rounded-md bg-gray-950 px-4 py-2 text-sm font-medium text-white" %>
+  </div>
+
+  <div class="mb-5 flex flex-wrap gap-2">
+    <% [["All", nil], ["Pending", "pending_review"], ["Confirmed", "confirmed"], ["Rejected", "rejected"], ["Submitted", "submitted"], ["Closed", "closed"]].each do |label, status| %>
+      <% active = @status == status || (@status.blank? && status.nil?) %>
+      <%= link_to label, candidate_potholes_path(status: status), class: "rounded-md border px-3 py-2 text-sm #{active ? "border-gray-950 bg-gray-950 text-white" : "border-gray-300 text-gray-700"}" %>
+    <% end %>
+  </div>
+
+  <div class="overflow-hidden rounded-lg border border-gray-200 bg-white">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Image</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Confidence</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Location</th>
+          <th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Captured</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        <% @candidate_potholes.each do |candidate| %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <%= link_to candidate do %>
+                <% if candidate.image.attached? %>
+                  <%= image_tag candidate.image.variant(:thumb), class: "h-16 w-24 rounded object-cover" %>
+                <% else %>
+                  <div class="h-16 w-24 rounded bg-gray-100"></div>
+                <% end %>
+              <% end %>
+            </td>
+            <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= candidate.status.humanize %></td>
+            <td class="px-4 py-3 text-sm text-gray-700"><%= number_to_percentage(candidate.detector_confidence.to_f * 100, precision: 1) %></td>
+            <td class="px-4 py-3 text-sm text-gray-700">
+              <%= link_to "#{candidate.latitude}, #{candidate.longitude}", "https://www.google.com/maps/search/?api=1&query=#{candidate.latitude},#{candidate.longitude}", target: "_blank", rel: "noopener", class: "text-blue-700 underline" %>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-700"><%= l candidate.captured_at, format: :short %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <% if @candidate_potholes.empty? %>
+      <div class="p-8 text-center text-sm text-gray-600">No candidate potholes match this filter.</div>
+    <% end %>
+  </div>
+</div>
