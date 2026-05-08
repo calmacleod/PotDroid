@@ -532,7 +532,7 @@ private fun PotDroidPermissionsPreview() {
             PotDroidScreen(
                 apiBaseUrl = "https://example.trycloudflare.com/",
                 apiToken = "",
-                pairingInput = "potdroid://pair?api_base_url=https%3A%2F%2Fexample.trycloudflare.com&code=ABCD-EFGH-JK23",
+                pairingInput = "potdroid://pair?u=https%3A%2F%2Fexample.trycloudflare.com&c=ABCD-EFGH-JK23",
                 pairingStatus = null,
                 hasCameraPermission = false,
                 onApiBaseUrlChange = {},

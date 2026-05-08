@@ -27,13 +27,15 @@ Seed login:
 - email: `driver@example.com`
 - password: `password123`
 
-In another terminal, expose Rails to a physical Android device:
+`scripts/dev` starts Rails and, when `cloudflared` is on `PATH`, starts a Cloudflare quick tunnel first. The generated HTTPS URL is exported into the Rails process as `POTDROID_API_BASE_URL`, so Android pairing QR codes point at the tunnel URL automatically.
+
+To run Rails without the tunnel:
 
 ```sh
-scripts/tunnel
+POTDROID_DEV_TUNNEL=false scripts/dev
 ```
 
-Paste the Cloudflare tunnel URL and a Rails-generated Android API token into the Android app's debug settings.
+`scripts/tunnel` remains available when you only want the raw Cloudflare tunnel process.
 
 If you install `devenv`, run `devenv shell` from the repo root to get `cloudflared`, Android platform tools, JDK 17, and the Android Gradle environment in one shell. For automatic activation, use `devenv hook` or run `direnv allow` once; `GRADLE_USER_HOME` will be set automatically when you enter the repo.
 

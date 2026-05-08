@@ -16,7 +16,7 @@
       <div class="split-panel pairing-panel">
         <div class="qr-column">
           <div class="qr-wrap">
-            <%= @pairing_session.qr_svg(raw_code: @raw_code, api_base_url: ENV.fetch("POTDROID_API_BASE_URL") { request.base_url }).html_safe %>
+            <%= @pairing_session.qr_svg(raw_code: @raw_code, api_base_url: @api_base_url).html_safe %>
           </div>
           <p class="qr-caption">Scan from the Android app pairing screen.</p>
         </div>
@@ -28,7 +28,7 @@
           </div>
           <div class="definition-row">
             <dt>API base URL</dt>
-            <dd class="mono"><%= ENV.fetch("POTDROID_API_BASE_URL") { request.base_url } %></dd>
+            <dd class="mono"><%= @api_base_url %></dd>
           </div>
           <div class="definition-row">
             <dt>QR payload</dt>

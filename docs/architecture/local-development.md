@@ -40,13 +40,21 @@ If `devenv` is not installed, `.envrc` falls back to the same Android environmen
 
 ## Cloudflare Tunnel
 
-Install `cloudflared`, then run:
+Install `cloudflared`, then start the parent dev script:
 
 ```sh
-scripts/tunnel
+scripts/dev
 ```
 
-Paste the emitted HTTPS URL into the Android app's API base URL field. Keep the trailing slash.
+The parent script starts `cloudflared tunnel --url http://localhost:3000`, waits for the emitted `https://*.trycloudflare.com` URL, exports it as `POTDROID_API_BASE_URL`, and then starts the Rails `bin/dev` process. Rails pairing QR codes use that tunnel URL automatically.
+
+To run without Cloudflare:
+
+```sh
+POTDROID_DEV_TUNNEL=false scripts/dev
+```
+
+`scripts/tunnel` remains available for running the tunnel by itself.
 
 ## Android
 

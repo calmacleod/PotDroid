@@ -21,10 +21,10 @@ Tokens are long-lived. The preferred way to obtain one is the pairing flow below
 From the Rails UI, click **Pair Android app**. Rails creates a one-time code that expires after 15 minutes and renders a QR deep link:
 
 ```text
-potdroid://pair?api_base_url=https%3A%2F%2Fexample.trycloudflare.com&code=ABCD-EFGH-JK23
+potdroid://pair?u=https%3A%2F%2Fexample.trycloudflare.com&c=ABCD-EFGH-JK23
 ```
 
-Android can open the deep link directly, paste the deep link, paste the legacy JSON payload, or submit just the code.
+Android can open the compact deep link directly, paste the deep link, paste the legacy JSON payload, paste the legacy `api_base_url`/`code` deep link, or submit just the code.
 
 `POST /api/v1/pairing`
 

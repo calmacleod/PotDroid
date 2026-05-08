@@ -15,4 +15,16 @@ RSpec.describe "Pairing sessions", type: :request do
     expect(response.body).to include("<svg")
     expect(user.pairing_sessions.count).to eq(1)
   end
+
+  it "uses the injected API base URL for Android pairing" do
+    original_url = ENV["POTDROID_API_BASE_URL"]
+    ENV["POTDROID_API_BASE_URL"] = "https://dev-tunnel.trycloudflare.com"
+
+    post pairing_sessions_path
+
+    expect(response.body).to include("https://dev-tunnel.trycloudflare.com")
+    expect(response.body).to include("u=https%3A%2F%2Fdev-tunnel.trycloudflare.com")
+  ensure
+    ENV["POTDROID_API_BASE_URL"] = original_url
+  end
 end

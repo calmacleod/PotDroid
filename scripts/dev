@@ -1,7 +1,71 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/../rails"
-echo "Rails API: http://localhost:3000"
-echo "Run scripts/tunnel in another terminal for physical Android device testing."
-exec mise exec ruby@4.0.1 -- bin/dev
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RAILS_DIR="$ROOT/rails"
+PORT="${PORT:-3000}"
+TUNNEL_PID=""
+TUNNEL_LOG=""
+
+cleanup() {
+  if [ -n "$TUNNEL_PID" ] && kill -0 "$TUNNEL_PID" >/dev/null 2>&1; then
+    kill "$TUNNEL_PID" >/dev/null 2>&1 || true
+    wait "$TUNNEL_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [ -n "$TUNNEL_LOG" ]; then
+    rm -f "$TUNNEL_LOG"
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+start_tunnel() {
+  if [ "${POTDROID_DEV_TUNNEL:-true}" = "false" ]; then
+    echo "Cloudflare tunnel: disabled."
+    return
+  fi
+
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "Cloudflare tunnel: cloudflared is not installed or not on PATH."
+    return
+  fi
+
+  TUNNEL_LOG="$(mktemp)"
+  cloudflared tunnel --url "http://localhost:${PORT}" >"$TUNNEL_LOG" 2>&1 &
+  TUNNEL_PID="$!"
+
+  echo "Cloudflare tunnel: waiting for public URL..."
+
+  for _ in {1..60}; do
+    if ! kill -0 "$TUNNEL_PID" >/dev/null 2>&1; then
+      cat "$TUNNEL_LOG"
+      echo "Cloudflare tunnel: failed before a URL was emitted."
+      TUNNEL_PID=""
+      return
+    fi
+
+    tunnel_url="$(grep -Eo 'https://[-a-zA-Z0-9]+\.trycloudflare\.com' "$TUNNEL_LOG" | tail -n 1 || true)"
+    if [ -n "$tunnel_url" ]; then
+      export POTDROID_API_BASE_URL="$tunnel_url"
+      echo "Cloudflare tunnel: $POTDROID_API_BASE_URL"
+      return
+    fi
+
+    sleep 0.5
+  done
+
+  echo "Cloudflare tunnel: timed out waiting for URL. Rails will use localhost."
+}
+
+start_tunnel
+
+cd "$RAILS_DIR"
+echo "Rails API: http://localhost:${PORT}"
+if [ -n "${POTDROID_API_BASE_URL:-}" ]; then
+  echo "Android API URL: $POTDROID_API_BASE_URL"
+else
+  echo "Android API URL: unavailable until a tunnel is started."
+fi
+
+mise exec ruby@4.0.1 -- bin/dev "$@"
