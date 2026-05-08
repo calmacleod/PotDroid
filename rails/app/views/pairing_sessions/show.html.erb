@@ -13,9 +13,12 @@
       <span class="badge status-pending">Expires in 15 min</span>
     </div>
     <div class="panel-body">
-      <div class="split-panel">
-        <div class="qr-wrap">
-          <%= @pairing_session.qr_svg(raw_code: @raw_code, api_base_url: ENV.fetch("POTDROID_API_BASE_URL") { request.base_url }).html_safe %>
+      <div class="split-panel pairing-panel">
+        <div class="qr-column">
+          <div class="qr-wrap">
+            <%= @pairing_session.qr_svg(raw_code: @raw_code, api_base_url: ENV.fetch("POTDROID_API_BASE_URL") { request.base_url }).html_safe %>
+          </div>
+          <p class="qr-caption">Scan from the Android app pairing screen.</p>
         </div>
 
         <dl class="definition-list">
@@ -29,7 +32,7 @@
           </div>
           <div class="definition-row">
             <dt>QR payload</dt>
-            <dd class="mono subtle"><%= @pairing_payload %></dd>
+            <dd class="payload-value"><code><%= @pairing_payload %></code></dd>
           </div>
         </dl>
       </div>

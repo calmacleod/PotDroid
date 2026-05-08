@@ -602,7 +602,7 @@ input[type="submit"].button.primary {
 }
 
 .qr-wrap {
-  width: fit-content;
+  width: min(100%, 260px);
   max-width: 100%;
   margin: 0 auto;
   padding: 10px;
@@ -611,10 +611,57 @@ input[type="submit"].button.primary {
   border-radius: 8px;
 }
 
+.qr-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.qr-column {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  justify-items: center;
+}
+
+.qr-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.payload-value {
+  min-width: 0;
+  text-align: left;
+}
+
+.payload-value code {
+  display: block;
+  max-width: 100%;
+  max-height: 150px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .split-panel {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 12px;
+}
+
+.pairing-panel {
+  align-items: start;
 }
 
 @media (max-width: 900px) {
