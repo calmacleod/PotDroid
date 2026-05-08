@@ -4,7 +4,7 @@
       <h1 class="text-3xl font-semibold tracking-tight text-gray-950">Candidate potholes</h1>
       <p class="mt-1 text-sm text-gray-600">Review detections uploaded from the Android app.</p>
     </div>
-    <%= button_to "Create Android token", api_tokens_path, params: { api_token: { name: "Android device" } }, class: "rounded-md bg-gray-950 px-4 py-2 text-sm font-medium text-white" %>
+    <%= button_to "Pair Android app", pairing_sessions_path, class: "rounded-md bg-gray-950 px-4 py-2 text-sm font-medium text-white" %>
   </div>
 
   <div class="mb-5 flex flex-wrap gap-2">

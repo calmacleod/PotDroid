@@ -1,6 +1,7 @@
 package com.potdroid.android
 
 import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,11 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.viewinterop.AndroidView
 import com.potdroid.android.data.DebugSettings
+import com.potdroid.android.network.ApiClient
+import com.potdroid.android.network.PairingParser
+import com.potdroid.android.network.PairingPayload
+import com.potdroid.android.network.PairingRequest
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,7 +60,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    PotDroidApp()
+                    PotDroidApp(initialPairingInput = intent?.dataString.orEmpty())
                 }
             }
         }
@@ -61,11 +68,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PotDroidApp() {
+fun PotDroidApp(initialPairingInput: String = "") {
     val context = LocalContext.current
     val settings = remember { DebugSettings(context) }
+    val scope = rememberCoroutineScope()
     var apiBaseUrl by remember { mutableStateOf(settings.apiBaseUrl) }
     var apiToken by remember { mutableStateOf(settings.apiToken) }
+    var pairingInput by remember { mutableStateOf(initialPairingInput) }
+    var pairingStatus by remember { mutableStateOf<String?>(null) }
     var hasCameraPermission by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -85,12 +95,51 @@ fun PotDroidApp() {
     PotDroidScreen(
         apiBaseUrl = apiBaseUrl,
         apiToken = apiToken,
+        pairingInput = pairingInput,
+        pairingStatus = pairingStatus,
         hasCameraPermission = hasCameraPermission,
         onApiBaseUrlChange = { apiBaseUrl = it },
         onApiTokenChange = { apiToken = it },
+        onPairingInputChange = { pairingInput = it },
         onSave = {
             settings.apiBaseUrl = apiBaseUrl
             settings.apiToken = apiToken
+            pairingStatus = "Connection settings saved."
+        },
+        onPair = {
+            scope.launch {
+                pairingStatus = "Pairing..."
+                val parsedPairing = PairingParser.parse(pairingInput, fallbackApiBaseUrl = apiBaseUrl)
+                settings.apiBaseUrl = parsedPairing.apiBaseUrl
+                apiBaseUrl = settings.apiBaseUrl
+
+                runCatching {
+                    ApiClient(settings).candidatePotholeApi().claimPairing(
+                        PairingRequest(
+                            pairing = PairingPayload(
+                                code = parsedPairing.code,
+                                deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
+                            )
+                        )
+                    )
+                }.onSuccess { response ->
+                    if (response.isSuccessful) {
+                        val token = response.body()?.data?.attributes?.apiToken
+                        if (token.isNullOrBlank()) {
+                            pairingStatus = "Pairing response did not include a token."
+                        } else {
+                            settings.apiToken = token
+                            apiToken = token
+                            pairingInput = ""
+                            pairingStatus = "Paired. Long-lived token saved."
+                        }
+                    } else {
+                        pairingStatus = "Pairing failed: HTTP ${response.code()}"
+                    }
+                }.onFailure { error ->
+                    pairingStatus = "Pairing failed: ${error.message ?: error::class.java.simpleName}"
+                }
+            }
         },
         onRequestPermissions = {
             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
@@ -103,10 +152,14 @@ fun PotDroidApp() {
 fun PotDroidScreen(
     apiBaseUrl: String,
     apiToken: String,
+    pairingInput: String,
+    pairingStatus: String?,
     hasCameraPermission: Boolean,
     onApiBaseUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
+    onPairingInputChange: (String) -> Unit,
     onSave: () -> Unit,
+    onPair: () -> Unit,
     onRequestPermissions: () -> Unit,
     modifier: Modifier = Modifier,
     cameraContent: @Composable (Modifier) -> Unit = { cameraModifier ->
@@ -142,6 +195,12 @@ fun PotDroidScreen(
             modifier = Modifier.fillMaxWidth(),
             visualTransformation = PasswordVisualTransformation(),
         )
+        OutlinedTextField(
+            value = pairingInput,
+            onValueChange = onPairingInputChange,
+            label = { Text("Pairing code or QR payload") },
+            modifier = Modifier.fillMaxWidth(),
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = onSave,
@@ -151,10 +210,18 @@ fun PotDroidScreen(
             Button(onClick = onRequestPermissions) {
                 Text("Permissions")
             }
+            Button(onClick = onPair, enabled = pairingInput.isNotBlank()) {
+                Text("Pair")
+            }
+        }
+        if (pairingStatus.present()) {
+            Text(pairingStatus.orEmpty(), style = MaterialTheme.typography.bodySmall)
         }
         Spacer(modifier = Modifier.height(4.dp))
     }
 }
+
+private fun String?.present(): Boolean = !isNullOrBlank()
 
 @Composable
 fun CameraPreview(modifier: Modifier = Modifier) {
@@ -210,10 +277,14 @@ private fun PotDroidReadyPreview() {
             PotDroidScreen(
                 apiBaseUrl = "https://example.trycloudflare.com/",
                 apiToken = "pd_preview_token",
+                pairingInput = "",
+                pairingStatus = "Paired. Long-lived token saved.",
                 hasCameraPermission = true,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},
+                onPairingInputChange = {},
                 onSave = {},
+                onPair = {},
                 onRequestPermissions = {},
             )
         }
@@ -228,10 +299,14 @@ private fun PotDroidPermissionsPreview() {
             PotDroidScreen(
                 apiBaseUrl = "https://example.trycloudflare.com/",
                 apiToken = "",
+                pairingInput = "potdroid://pair?api_base_url=https%3A%2F%2Fexample.trycloudflare.com&code=ABCD-EFGH-JK23",
+                pairingStatus = null,
                 hasCameraPermission = false,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},
+                onPairingInputChange = {},
                 onSave = {},
+                onPair = {},
                 onRequestPermissions = {},
             )
         }

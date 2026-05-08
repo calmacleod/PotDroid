@@ -6,12 +6,16 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.GET
+import retrofit2.http.Body
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 
 interface CandidatePotholeApi {
+    @POST("api/v1/pairing")
+    suspend fun claimPairing(@Body request: PairingRequest): Response<PairingResponse>
+
     @Multipart
     @POST("api/v1/candidate_potholes")
     suspend fun createCandidate(
@@ -32,6 +36,36 @@ interface CandidatePotholeApi {
     @GET("api/v1/candidate_potholes/{id}")
     suspend fun candidate(@Path("id") id: Long): CandidateResponse
 }
+
+@Serializable
+data class PairingRequest(
+    val pairing: PairingPayload,
+)
+
+@Serializable
+data class PairingPayload(
+    val code: String,
+    @SerialName("device_name") val deviceName: String,
+)
+
+@Serializable
+data class PairingResponse(
+    val data: PairingData,
+)
+
+@Serializable
+data class PairingData(
+    val type: String,
+    val attributes: PairingAttributes,
+)
+
+@Serializable
+data class PairingAttributes(
+    @SerialName("api_token") val apiToken: String,
+    @SerialName("token_type") val tokenType: String,
+    @SerialName("long_lived") val longLived: Boolean,
+    @SerialName("user_email") val userEmail: String? = null,
+)
 
 @Serializable
 data class CandidateResponse(

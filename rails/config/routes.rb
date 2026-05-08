@@ -9,10 +9,12 @@ Rails.application.routes.draw do
     end
   end
   resources :api_tokens, only: %i[ create ]
+  resources :pairing_sessions, only: %i[ create ]
 
   namespace :api do
     namespace :v1 do
       resources :candidate_potholes, only: %i[ create show ]
+      resource :pairing, only: %i[ create ]
     end
   end
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_124532) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_134503) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -100,6 +100,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_124532) do
     t.index ["status"], name: "index_city_submissions_on_status"
   end
 
+  create_table "pairing_sessions", force: :cascade do |t|
+    t.integer "api_token_id"
+    t.datetime "claimed_at"
+    t.string "code_digest", null: false
+    t.datetime "created_at", null: false
+    t.string "device_name"
+    t.datetime "expires_at", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["api_token_id"], name: "index_pairing_sessions_on_api_token_id"
+    t.index ["claimed_at"], name: "index_pairing_sessions_on_claimed_at"
+    t.index ["expires_at"], name: "index_pairing_sessions_on_expires_at"
+    t.index ["user_id"], name: "index_pairing_sessions_on_user_id"
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -124,5 +139,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_124532) do
   add_foreign_key "candidate_potholes", "users", column: "reviewed_by_id"
   add_foreign_key "city_submission_events", "city_submissions"
   add_foreign_key "city_submissions", "candidate_potholes"
+  add_foreign_key "pairing_sessions", "api_tokens"
+  add_foreign_key "pairing_sessions", "users"
   add_foreign_key "sessions", "users"
 end
