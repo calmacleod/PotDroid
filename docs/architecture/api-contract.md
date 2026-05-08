@@ -72,7 +72,7 @@ Multipart field names:
 - `candidate_pothole[bounding_box][right]`
 - `candidate_pothole[bounding_box][bottom]`
 
-Successful responses return `201 Created` with the candidate id, status, metadata, image URL, and city submission state when present.
+Successful responses return `201 Created` with the candidate id, status, metadata, image URL, image validation state, and city submission state when present. Rails enqueues an async image reliability validation job after the upload is stored. The job runs the local detector against the original image plus transformed versions of the image. Candidates remain reviewable only when every validation check detects the pothole at or above the server threshold; failed reliability checks automatically move the candidate to `rejected`.
 
 ## Validate Image Against Local Detector
 

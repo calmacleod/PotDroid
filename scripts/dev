@@ -3,9 +3,16 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RAILS_DIR="$ROOT/rails"
+LOCAL_TUNNEL_ENV="$ROOT/.local/cloudflare-tunnel.env"
+LOCAL_CLOUDFLARED_DIR="$ROOT/.local/cloudflared"
 PORT="${PORT:-3000}"
 TUNNEL_PID=""
 TUNNEL_LOG=""
+
+if [ -f "$LOCAL_TUNNEL_ENV" ]; then
+  # shellcheck source=/dev/null
+  source "$LOCAL_TUNNEL_ENV"
+fi
 
 cleanup() {
   if [ -n "$TUNNEL_PID" ] && kill -0 "$TUNNEL_PID" >/dev/null 2>&1; then
@@ -31,6 +38,53 @@ start_tunnel() {
     return
   fi
 
+  if [ -n "${POTDROID_TUNNEL_ID:-}" ] && [ -n "${POTDROID_TUNNEL_HOSTNAME:-}" ]; then
+    start_named_tunnel
+    return
+  fi
+
+  start_quick_tunnel
+}
+
+start_named_tunnel() {
+  mkdir -p "$LOCAL_CLOUDFLARED_DIR"
+
+  local tunnel_config="$LOCAL_CLOUDFLARED_DIR/config.yml"
+  local credentials_file="${POTDROID_TUNNEL_CREDENTIALS_FILE:-$HOME/.cloudflared/${POTDROID_TUNNEL_ID}.json}"
+
+  cat >"$tunnel_config" <<YAML
+tunnel: ${POTDROID_TUNNEL_ID}
+credentials-file: ${credentials_file}
+
+ingress:
+  - hostname: ${POTDROID_TUNNEL_HOSTNAME}
+    service: http://localhost:${PORT}
+  - service: http_status:404
+YAML
+
+  TUNNEL_LOG="$(mktemp)"
+  cloudflared tunnel --config "$tunnel_config" run "$POTDROID_TUNNEL_ID" >"$TUNNEL_LOG" 2>&1 &
+  TUNNEL_PID="$!"
+  export POTDROID_API_BASE_URL="https://${POTDROID_TUNNEL_HOSTNAME}"
+
+  echo "Cloudflare tunnel: starting ${POTDROID_TUNNEL_HOSTNAME}..."
+
+  for _ in {1..20}; do
+    if ! kill -0 "$TUNNEL_PID" >/dev/null 2>&1; then
+      cat "$TUNNEL_LOG"
+      echo "Cloudflare tunnel: named tunnel failed to start."
+      TUNNEL_PID=""
+      unset POTDROID_API_BASE_URL
+      return
+    fi
+
+    sleep 0.25
+  done
+
+  echo "Cloudflare tunnel: $POTDROID_API_BASE_URL"
+}
+
+start_quick_tunnel() {
   TUNNEL_LOG="$(mktemp)"
   cloudflared tunnel --url "http://localhost:${PORT}" >"$TUNNEL_LOG" 2>&1 &
   TUNNEL_PID="$!"

@@ -1,12 +1,39 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOCAL_TUNNEL_ENV="$ROOT/.local/cloudflare-tunnel.env"
+LOCAL_CLOUDFLARED_DIR="$ROOT/.local/cloudflared"
 PORT="${PORT:-3000}"
 
 if ! command -v cloudflared >/dev/null 2>&1; then
   echo "cloudflared is not installed or not on PATH."
   echo "Install it, then rerun: cloudflared tunnel --url http://localhost:${PORT}"
   exit 1
+fi
+
+if [ -f "$LOCAL_TUNNEL_ENV" ]; then
+  # shellcheck source=/dev/null
+  source "$LOCAL_TUNNEL_ENV"
+fi
+
+if [ -n "${POTDROID_TUNNEL_ID:-}" ] && [ -n "${POTDROID_TUNNEL_HOSTNAME:-}" ]; then
+  mkdir -p "$LOCAL_CLOUDFLARED_DIR"
+  credentials_file="${POTDROID_TUNNEL_CREDENTIALS_FILE:-$HOME/.cloudflared/${POTDROID_TUNNEL_ID}.json}"
+  tunnel_config="$LOCAL_CLOUDFLARED_DIR/config.yml"
+
+  cat >"$tunnel_config" <<YAML
+tunnel: ${POTDROID_TUNNEL_ID}
+credentials-file: ${credentials_file}
+
+ingress:
+  - hostname: ${POTDROID_TUNNEL_HOSTNAME}
+    service: http://localhost:${PORT}
+  - service: http_status:404
+YAML
+
+  echo "Cloudflare tunnel: https://${POTDROID_TUNNEL_HOSTNAME} -> http://localhost:${PORT}"
+  exec cloudflared tunnel --config "$tunnel_config" run "$POTDROID_TUNNEL_ID"
 fi
 
 exec cloudflared tunnel --url "http://localhost:${PORT}"

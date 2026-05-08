@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOCAL_DIR="$ROOT/.local"
+LOCAL_TUNNEL_ENV="$LOCAL_DIR/cloudflare-tunnel.env"
+DEFAULT_TUNNEL_NAME="potdroid-dev"
+
+usage() {
+  cat <<MSG
+Usage:
+  scripts/setup-tunnel HOSTNAME [TUNNEL_NAME]
+
+Example:
+  scripts/setup-tunnel potdroid-dev.example.com
+  scripts/setup-tunnel potdroid-dev.example.com potdroid-dev
+
+Requires:
+  - cloudflared on PATH
+  - cloudflared login already completed for the Cloudflare account/zone
+
+Writes gitignored local config to:
+  $LOCAL_TUNNEL_ENV
+MSG
+}
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+
+TUNNEL_HOSTNAME="${1:-${POTDROID_TUNNEL_HOSTNAME:-}}"
+TUNNEL_NAME="${2:-${POTDROID_TUNNEL_NAME:-$DEFAULT_TUNNEL_NAME}}"
+
+if [ -z "$TUNNEL_HOSTNAME" ]; then
+  usage
+  exit 1
+fi
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "cloudflared is not installed or not on PATH."
+  exit 1
+fi
+
+run_ruby_json() {
+  if command -v mise >/dev/null 2>&1; then
+    mise exec ruby@4.0.1 -- ruby -rjson "$@"
+  else
+    ruby -rjson "$@"
+  fi
+}
+
+find_tunnel_id() {
+  local tunnel_name="$1"
+
+  cloudflared tunnel list --name "$tunnel_name" --output json | run_ruby_json -e '
+    name = ARGV.fetch(0)
+    payload = JSON.parse(STDIN.read)
+    tunnels =
+      if payload.is_a?(Array)
+        payload
+      elsif payload.respond_to?(:fetch)
+        payload.fetch("tunnels", []) || []
+      else
+        []
+      end
+    tunnel = tunnels.find { |entry| entry["name"] == name && entry["deletedAt"].nil? }
+    puts tunnel && (tunnel["id"] || tunnel["uuid"])
+  ' "$tunnel_name"
+}
+
+create_tunnel() {
+  local tunnel_name="$1"
+
+  cloudflared tunnel create --output json "$tunnel_name" | run_ruby_json -e '
+    payload = JSON.parse(STDIN.read)
+    exit 1 unless payload.respond_to?(:[])
+
+    puts [payload["id"] || payload["uuid"], payload["credentials_file"] || payload["credentialsFile"]].compact.join("\n")
+  '
+}
+
+quote_shell_value() {
+  printf "%q" "$1"
+}
+
+mkdir -p "$LOCAL_DIR"
+
+TUNNEL_ID="$(find_tunnel_id "$TUNNEL_NAME")"
+CREDENTIALS_FILE="${POTDROID_TUNNEL_CREDENTIALS_FILE:-}"
+
+if [ -z "$TUNNEL_ID" ]; then
+  echo "Cloudflare tunnel: creating named tunnel '$TUNNEL_NAME'..."
+  create_output="$(create_tunnel "$TUNNEL_NAME")"
+  TUNNEL_ID="$(printf "%s\n" "$create_output" | sed -n "1p")"
+  CREDENTIALS_FILE="$(printf "%s\n" "$create_output" | sed -n "2p")"
+else
+  echo "Cloudflare tunnel: reusing existing named tunnel '$TUNNEL_NAME'."
+fi
+
+if [ -z "$TUNNEL_ID" ]; then
+  echo "Cloudflare tunnel: could not determine tunnel id."
+  exit 1
+fi
+
+CREDENTIALS_FILE="${CREDENTIALS_FILE:-$HOME/.cloudflared/${TUNNEL_ID}.json}"
+
+route_args=()
+if [ "${POTDROID_TUNNEL_OVERWRITE_DNS:-false}" = "true" ]; then
+  route_args+=(--overwrite-dns)
+fi
+
+echo "Cloudflare tunnel: routing ${TUNNEL_HOSTNAME} to ${TUNNEL_NAME}..."
+route_output="$(cloudflared tunnel route dns "${route_args[@]}" "$TUNNEL_ID" "$TUNNEL_HOSTNAME" 2>&1)"
+printf "%s\n" "$route_output"
+
+routed_hostname="$(printf "%s\n" "$route_output" | ruby -ne 'puts $1 if $_ =~ /\bINF\s+([^[:space:]]+)\s+/' | tail -n 1)"
+if [ -n "$routed_hostname" ] && [ "$routed_hostname" != "$TUNNEL_HOSTNAME" ]; then
+  cat <<MSG
+
+Cloudflare routed '$routed_hostname' instead of '$TUNNEL_HOSTNAME'.
+This usually means cloudflared is authenticated against a different zone.
+
+Use a hostname inside the authenticated Cloudflare zone, or run cloudflared login
+for the zone that owns '$TUNNEL_HOSTNAME' and rerun this setup script.
+MSG
+  exit 1
+fi
+
+{
+  printf "POTDROID_TUNNEL_NAME=%s\n" "$(quote_shell_value "$TUNNEL_NAME")"
+  printf "POTDROID_TUNNEL_ID=%s\n" "$(quote_shell_value "$TUNNEL_ID")"
+  printf "POTDROID_TUNNEL_HOSTNAME=%s\n" "$(quote_shell_value "$TUNNEL_HOSTNAME")"
+  printf "POTDROID_TUNNEL_CREDENTIALS_FILE=%s\n" "$(quote_shell_value "$CREDENTIALS_FILE")"
+} >"$LOCAL_TUNNEL_ENV"
+
+echo
+echo "Cloudflare tunnel: configured https://${TUNNEL_HOSTNAME}"
+echo "Local config: $LOCAL_TUNNEL_ENV"
+echo
+echo "Next run:"
+echo "  scripts/dev"
+
+if [ ! -f "$CREDENTIALS_FILE" ]; then
+  echo
+  echo "Warning: credentials file was not found at $CREDENTIALS_FILE."
+  echo "If this tunnel was created on another machine, recreate it locally or set POTDROID_TUNNEL_CREDENTIALS_FILE."
+fi

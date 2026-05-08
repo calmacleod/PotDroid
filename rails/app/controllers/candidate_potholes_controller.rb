@@ -1,11 +1,19 @@
 class CandidatePotholesController < ApplicationController
-  before_action :set_candidate_pothole, only: %i[ show confirm reject submit validate_detector ]
+  before_action :set_candidate_pothole, only: %i[ show confirm reject submit validate_detector revalidate_image ]
 
   def index
     @status = params[:status]
     @candidate_potholes = Current.user.candidate_potholes.with_attached_image.with_status(@status).recent_first
     @status_counts = Current.user.candidate_potholes.group(:status).count
     @candidate_total = @status_counts.values.sum
+  end
+
+  def map
+    @status = params[:status]
+    @candidate_potholes = Current.user.candidate_potholes.with_attached_image.includes(:city_submission).with_status(@status).recent_first
+    @status_counts = Current.user.candidate_potholes.group(:status).count
+    @candidate_total = @status_counts.values.sum
+    @mapbox_access_token = ENV["MAPBOX_ACCESS_TOKEN"].to_s
   end
 
   def show
@@ -30,11 +38,18 @@ class CandidatePotholesController < ApplicationController
   end
 
   def validate_detector
-    flash[:detector_validation_result] = validate_attached_image
+    flash[:detector_validation_result] = flash_safe_detector_validation_result(validate_attached_image)
     redirect_to @candidate_pothole, status: :see_other
   rescue PotholeDetector::Unavailable, PotholeDetector::InferenceError => error
     flash[:detector_validation_error] = error.message
     redirect_to @candidate_pothole, status: :see_other
+  end
+
+  def revalidate_image
+    @candidate_pothole.request_image_revalidation!
+    ProcessCandidatePotholeUploadJob.perform_later(@candidate_pothole.id)
+
+    redirect_to @candidate_pothole, notice: "Image validation queued.", status: :see_other
   end
 
   private
@@ -55,4 +70,13 @@ class CandidatePotholesController < ApplicationController
     end
   end
 
+  def flash_safe_detector_validation_result(result)
+    result.slice(
+      "detected",
+      "confidence",
+      "threshold",
+      "model_version",
+      "bounding_box"
+    )
+  end
 end

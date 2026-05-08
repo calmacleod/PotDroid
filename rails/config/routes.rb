@@ -4,11 +4,16 @@ Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
   resources :candidate_potholes, only: %i[ index show ] do
+    collection do
+      get :map
+    end
+
     member do
       patch :confirm
       patch :reject
       post :submit
       post :validate_detector
+      post :revalidate_image
     end
   end
   resources :candidate_pothole_reconciliations, only: %i[ index create ]

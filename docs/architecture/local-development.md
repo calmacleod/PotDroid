@@ -46,7 +46,29 @@ Install `cloudflared`, then start the parent dev script:
 scripts/dev
 ```
 
-The parent script starts `cloudflared tunnel --url http://localhost:3000`, waits for the emitted `https://*.trycloudflare.com` URL, exports it as `POTDROID_API_BASE_URL`, and then starts the Rails `bin/dev` process. Rails pairing QR codes use that tunnel URL automatically.
+By default, the parent script starts `cloudflared tunnel --url http://localhost:3000`, waits for the emitted `https://*.trycloudflare.com` URL, exports it as `POTDROID_API_BASE_URL`, and then starts the Rails `bin/dev` process. Rails pairing QR codes use that tunnel URL automatically.
+
+For a stable long-lived hostname, authenticate `cloudflared` and run the setup helper once:
+
+```sh
+scripts/setup-tunnel potdroid-dev.example.com
+```
+
+The hostname must belong to the Cloudflare zone selected during `cloudflared login`. If `cloudflared` is authenticated to `example.com`, use a hostname such as `potdroid-dev.example.com`.
+
+The optional second argument sets the Cloudflare tunnel name:
+
+```sh
+scripts/setup-tunnel potdroid-dev.example.com potdroid-dev
+```
+
+The setup helper creates or reuses the named tunnel, routes the hostname to that tunnel, and writes gitignored local config to `.local/cloudflare-tunnel.env`. After that, `scripts/dev` and `scripts/tunnel` use the named tunnel and export `POTDROID_API_BASE_URL=https://potdroid-dev.example.com` instead of generating a new `trycloudflare.com` URL on every run.
+
+If a DNS record already exists and should be replaced, run:
+
+```sh
+POTDROID_TUNNEL_OVERWRITE_DNS=true scripts/setup-tunnel potdroid-dev.example.com
+```
 
 To run without Cloudflare:
 

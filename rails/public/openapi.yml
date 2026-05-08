@@ -296,6 +296,28 @@ components:
         bounding_box:
           type: object
           additionalProperties: true
+        image_validation_status:
+          type: string
+          enum:
+            - pending
+            - validating
+            - accepted
+            - rejected
+            - failed
+        image_validation_results:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: "null"
+        image_validation_error:
+          type:
+            - string
+            - "null"
+        image_validated_at:
+          type:
+            - string
+            - "null"
+          format: date-time
         captured_at:
           type:
             - string

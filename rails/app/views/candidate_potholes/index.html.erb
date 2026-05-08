@@ -5,6 +5,7 @@
       <p class="page-kicker">Review detections uploaded from Android. Newest captures are first.</p>
     </div>
     <div class="button-group">
+      <%= link_to "Map view", map_candidate_potholes_path(status: @status), class: "button" %>
       <%= link_to "Reconcile duplicates", candidate_pothole_reconciliations_path, class: "button" %>
       <%= link_to "API docs", "/api-docs", class: "button" %>
       <%= button_to "Pair Android app", pairing_sessions_path, class: "button primary" %>
@@ -32,6 +33,7 @@
         <tr>
           <th>Image</th>
           <th>Status</th>
+          <th>Image validation</th>
           <th>Confidence</th>
           <th>Model</th>
           <th>Location</th>
@@ -55,6 +57,7 @@
               <% end %>
             </td>
             <td><span class="badge status-<%= candidate.status %>"><%= candidate.status.humanize %></span></td>
+            <td><span class="badge validation-<%= candidate.image_validation_status %>"><%= candidate.image_validation_status.humanize %></span></td>
             <td class="metric"><%= number_to_percentage(candidate.detector_confidence.to_f * 100, precision: 1) %></td>
             <td class="mono subtle"><%= candidate.detector_model_version.presence || "unknown" %></td>
             <td class="mono">

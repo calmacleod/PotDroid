@@ -1,4 +1,6 @@
 <div class="page">
+  <%= turbo_stream_from @candidate_pothole %>
+
   <div class="page-header">
     <div>
       <h1 class="page-title">Candidate #<%= @candidate_pothole.id %></h1>
@@ -6,6 +8,7 @@
     </div>
     <div class="button-group">
       <%= link_to "Back", candidate_potholes_path, class: "button" %>
+      <%= link_to "Map", map_candidate_potholes_path(status: @candidate_pothole.status), class: "button" %>
       <span class="badge status-<%= @candidate_pothole.status %>"><%= @candidate_pothole.status.humanize %></span>
     </div>
   </div>
@@ -57,6 +60,44 @@
         <div class="panel-actions">
           <%= link_to "Open map", "https://www.google.com/maps/search/?api=1&query=#{@candidate_pothole.latitude},#{@candidate_pothole.longitude}", target: "_blank", rel: "noopener", class: "button" %>
         </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Image validation</h2>
+          <span class="badge validation-<%= @candidate_pothole.image_validation_status %>"><%= @candidate_pothole.image_validation_status.humanize %></span>
+        </div>
+        <div class="panel-body">
+          <dl class="definition-list">
+            <div class="definition-row"><dt>Status</dt><dd><%= @candidate_pothole.image_validation_status.humanize %></dd></div>
+            <div class="definition-row"><dt>Validated</dt><dd class="mono"><%= @candidate_pothole.image_validated_at.present? ? l(@candidate_pothole.image_validated_at, format: :short) : "not yet" %></dd></div>
+            <% if @candidate_pothole.image_validation_results.present? %>
+              <div class="definition-row"><dt>Checks</dt><dd class="metric"><%= @candidate_pothole.image_validation_results.fetch("checks", []).count { |check| check["passed"] } %> / <%= @candidate_pothole.image_validation_results.fetch("checks", []).size %></dd></div>
+            <% end %>
+          </dl>
+
+          <div class="panel-actions">
+            <%= button_to "Re-run image validation", revalidate_image_candidate_pothole_path(@candidate_pothole), class: "button" %>
+          </div>
+
+          <% if @candidate_pothole.image_validation_error.present? %>
+            <p class="flash alert panel-actions"><%= @candidate_pothole.image_validation_error %></p>
+          <% end %>
+
+          <% if @candidate_pothole.image_validation_results.present? %>
+            <div class="validation-checks panel-actions">
+              <% @candidate_pothole.image_validation_results.fetch("checks", []).each do |check| %>
+                <div class="validation-check">
+                  <span class="mono"><%= check["name"].humanize %></span>
+                  <span class="badge <%= check["passed"] ? "validation-accepted" : "validation-rejected" %>">
+                    <%= check["passed"] ? "Passed" : "Failed" %>
+                  </span>
+                  <span class="metric"><%= check["confidence"].present? ? number_to_percentage(check["confidence"].to_f * 100, precision: 1) : "none" %></span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       </section>
 

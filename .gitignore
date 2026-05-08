@@ -1,10 +1,12 @@
 .DS_Store
 .devenv/
 .direnv/
+.local/
 
 rails/.bundle/
 rails/coverage/
 rails/db/*.sqlite3*
+rails/.env.local
 rails/log/*
 rails/tmp/*
 rails/storage/*

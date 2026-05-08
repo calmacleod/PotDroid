@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_08_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_171000) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -59,6 +59,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_170000) do
     t.string "detector_model_version"
     t.integer "duplicate_of_id"
     t.decimal "heading", precision: 6, scale: 2
+    t.datetime "image_validated_at"
+    t.text "image_validation_error"
+    t.json "image_validation_results"
+    t.integer "image_validation_status", default: 0, null: false
     t.decimal "latitude", precision: 10, scale: 6, null: false
     t.decimal "longitude", precision: 10, scale: 6, null: false
     t.datetime "reviewed_at"
@@ -70,6 +74,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_08_170000) do
     t.integer "user_id", null: false
     t.index ["captured_at"], name: "index_candidate_potholes_on_captured_at"
     t.index ["duplicate_of_id"], name: "index_candidate_potholes_on_duplicate_of_id"
+    t.index ["image_validation_status"], name: "index_candidate_potholes_on_image_validation_status"
     t.index ["reviewed_by_id"], name: "index_candidate_potholes_on_reviewed_by_id"
     t.index ["status"], name: "index_candidate_potholes_on_status"
     t.index ["user_id"], name: "index_candidate_potholes_on_user_id"

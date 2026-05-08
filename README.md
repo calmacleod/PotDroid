@@ -27,7 +27,13 @@ Seed login:
 - email: `driver@example.com`
 - password: `password123`
 
-`scripts/dev` starts Rails and, when `cloudflared` is on `PATH`, starts a Cloudflare quick tunnel first. The generated HTTPS URL is exported into the Rails process as `POTDROID_API_BASE_URL`, so Android pairing QR codes point at the tunnel URL automatically.
+`scripts/dev` starts Rails and, when `cloudflared` is on `PATH`, starts a Cloudflare tunnel first. To use a stable long-lived hostname instead of a new quick-tunnel URL on every run, configure it once:
+
+```sh
+scripts/setup-tunnel potdroid-dev.example.com
+```
+
+The setup writes gitignored local config under `.local/`. After that, `scripts/dev` exports the stable HTTPS URL into the Rails process as `POTDROID_API_BASE_URL`, so Android pairing QR codes point at the tunnel URL automatically. Without that local config, `scripts/dev` falls back to a Cloudflare quick tunnel.
 
 To run Rails without the tunnel:
 

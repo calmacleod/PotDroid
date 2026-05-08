@@ -16,6 +16,13 @@ class CandidatePothole < ApplicationRecord
     closed: 4,
     duplicate: 5
   }
+  enum :image_validation_status, {
+    pending: 0,
+    validating: 1,
+    accepted: 2,
+    rejected: 3,
+    failed: 4
+  }, prefix: :image_validation
 
   validates :latitude, numericality: { greater_than_or_equal_to: -90, less_than_or_equal_to: 90 }
   validates :longitude, numericality: { greater_than_or_equal_to: -180, less_than_or_equal_to: 180 }
@@ -43,6 +50,58 @@ class CandidatePothole < ApplicationRecord
   def mark_submitted!(external_status: nil)
     update!(status: :submitted, submitted_at: Time.current)
     city_submission&.update!(external_status: external_status) if external_status.present?
+  end
+
+  def begin_image_validation!
+    update!(
+      image_validation_status: :validating,
+      image_validation_error: nil,
+      image_validated_at: nil
+    )
+  end
+
+  def request_image_revalidation!
+    update!(
+      image_validation_status: :pending,
+      image_validation_results: nil,
+      image_validation_error: nil,
+      image_validated_at: nil
+    )
+  end
+
+  def complete_image_validation!(result)
+    attributes = {
+      image_validation_status: :accepted,
+      image_validation_results: result,
+      image_validation_error: nil,
+      image_validated_at: Time.current
+    }
+
+    if rejected? && reviewed_by_id.blank?
+      attributes[:status] = :pending_review
+      attributes[:reviewed_at] = nil
+    end
+
+    if result.fetch("accepted")
+      update!(attributes)
+    else
+      update!(
+        status: :rejected,
+        image_validation_status: :rejected,
+        image_validation_results: result,
+        image_validation_error: nil,
+        image_validated_at: Time.current,
+        reviewed_at: Time.current
+      )
+    end
+  end
+
+  def fail_image_validation!(error)
+    update!(
+      image_validation_status: :failed,
+      image_validation_error: error.message,
+      image_validated_at: Time.current
+    )
   end
 
   private

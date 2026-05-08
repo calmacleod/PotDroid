@@ -471,6 +471,26 @@ input[type="submit"].button.primary {
   border-color: #bfd3ff;
 }
 
+.validation-pending,
+.validation-validating {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: #ecd38c;
+}
+
+.validation-accepted {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: #b6e2cf;
+}
+
+.validation-rejected,
+.validation-failed {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: #f3bbb5;
+}
+
 .metric {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -823,6 +843,185 @@ input[type="submit"].button.primary {
   align-items: start;
 }
 
+.validation-checks {
+  display: grid;
+  gap: 6px;
+}
+
+.validation-check {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.map-panel {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  min-height: min(720px, calc(100vh - 220px));
+}
+
+.candidate-map {
+  width: 100%;
+  height: 100%;
+  min-height: min(720px, calc(100vh - 220px));
+  background: var(--surface-muted);
+}
+
+.map-token-warning {
+  position: absolute;
+  inset: 12px auto auto 12px;
+  z-index: 2;
+  max-width: 420px;
+  border: 1px solid #ecd38c;
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: var(--shadow);
+}
+
+.map-token-warning code {
+  color: var(--text);
+}
+
+.map-inspector {
+  min-width: 0;
+  max-height: min(720px, calc(100vh - 220px));
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  overflow: auto;
+}
+
+.map-inspector-empty {
+  padding: 14px;
+}
+
+.map-inspector-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.map-inspector-header {
+  display: grid;
+  gap: 2px;
+}
+
+.map-inspector-image-wrap {
+  min-height: 160px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111827;
+}
+
+.map-inspector-image {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+}
+
+.map-inspector-list {
+  display: grid;
+  gap: 6px;
+}
+
+.map-inspector-list-item {
+  appearance: none;
+  width: 100%;
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text);
+  padding: 6px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.map-inspector-list-item:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.map-inspector-list-media {
+  width: 72px;
+  height: 50px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: repeating-linear-gradient(135deg, #e6e9ed, #e6e9ed 8px, #f4f5f6 8px, #f4f5f6 16px);
+}
+
+.map-inspector-list-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.map-inspector-list-body {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.map-inspector-list-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.map-inspector-list-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.map-inspector-list-action {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .map-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-map {
+    height: 520px;
+    min-height: 360px;
+  }
+
+  .map-inspector {
+    max-height: 420px;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
 @media (max-width: 900px) {
   .topbar-inner,
   .dev-banner-inner,
@@ -854,5 +1053,10 @@ input[type="submit"].button.primary {
 
   .hero-image {
     min-height: 240px;
+  }
+
+  .validation-check {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 }

@@ -9,6 +9,8 @@ RSpec.describe "API candidate potholes", type: :request do
 
   describe "POST /api/v1/candidate_potholes" do
     it "creates an authenticated candidate pothole upload" do
+      allow(ProcessCandidatePotholeUploadJob).to receive(:perform_later)
+
       expect do
         post api_v1_candidate_potholes_path,
           params: {
@@ -28,6 +30,8 @@ RSpec.describe "API candidate potholes", type: :request do
       expect(response).to have_http_status(:created)
       expect(user.candidate_potholes.last.image).to be_attached
       expect(JSON.parse(response.body).dig("data", "attributes", "status")).to eq("pending_review")
+      expect(JSON.parse(response.body).dig("data", "attributes", "image_validation_status")).to eq("pending")
+      expect(ProcessCandidatePotholeUploadJob).to have_received(:perform_later).with(user.candidate_potholes.last.id)
     end
 
     it "rejects missing tokens" do
