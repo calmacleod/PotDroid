@@ -11,7 +11,7 @@ Rails.application.routes.draw do
     end
   end
   resources :api_tokens, only: %i[ create ]
-  resources :pairing_sessions, only: %i[ create ]
+  resources :pairing_sessions, only: %i[ show create ]
 
   namespace :api do
     namespace :v1 do

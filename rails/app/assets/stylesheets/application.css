@@ -120,6 +120,42 @@ input {
   flex-wrap: wrap;
 }
 
+.device-status {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 6px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.device-status.paired {
+  border-color: #a7dbc4;
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(15, 122, 79, 0.12);
+}
+
+.device-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
 .app-main {
   max-width: 1440px;
   margin: 0 auto;
@@ -654,6 +690,17 @@ input[type="submit"].button.primary {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.pairing-wait {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .split-panel {

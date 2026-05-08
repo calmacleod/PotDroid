@@ -72,6 +72,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
 
     testImplementation("junit:junit:4.13.2")

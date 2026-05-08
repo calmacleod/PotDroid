@@ -11,6 +11,8 @@ module Api
 
         if claimed
           pairing_session, raw_token = claimed
+          broadcast_pairing_success(pairing_session)
+
           render json: {
             data: {
               type: "pairing",
@@ -29,6 +31,13 @@ module Api
       end
 
       private
+
+      def broadcast_pairing_success(pairing_session)
+        Turbo::StreamsChannel.broadcast_stream_to(
+          pairing_session,
+          content: %(<turbo-stream action="redirect" url="#{ERB::Util.html_escape(candidate_potholes_path)}"></turbo-stream>)
+        )
+      end
 
       def pairing_params
         params.require(:pairing).permit(:code, :device_name)

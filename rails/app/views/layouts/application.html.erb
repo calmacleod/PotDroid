@@ -36,7 +36,15 @@
           <% end %>
 
           <% if authenticated? %>
+            <% paired_device = Current.user.latest_paired_android_device %>
             <nav class="topbar-actions" aria-label="Primary">
+              <% if paired_device %>
+                <div class="device-status paired" title="Paired <%= l paired_device.claimed_at, format: :short %>">
+                  <span class="status-dot"></span>
+                  <span>Android paired</span>
+                  <span class="device-name"><%= paired_device.device_name.presence || "Android device" %></span>
+                </div>
+              <% end %>
               <%= link_to "Candidates", candidate_potholes_path, class: "button ghost" %>
               <%= button_to "Pair Android app", pairing_sessions_path, class: "button primary" %>
               <%= button_to "Sign out", session_path, method: :delete, class: "button" %>

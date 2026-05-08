@@ -11,6 +11,8 @@ class PairingSession < ApplicationRecord
   validates :expires_at, presence: true
 
   scope :claimable, -> { where(claimed_at: nil).where("expires_at > ?", Time.current) }
+  scope :claimed, -> { where.not(claimed_at: nil) }
+  scope :recently_claimed, -> { order(claimed_at: :desc) }
 
   def self.issue_for!(user)
     raw_code = generate_code

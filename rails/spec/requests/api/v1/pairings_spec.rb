@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "API pairings", type: :request do
+  include ActionCable::TestHelper
+
   describe "POST /api/v1/pairing" do
     it "exchanges a valid pairing code for a bearer token" do
       user = create(:user)
@@ -19,6 +21,23 @@ RSpec.describe "API pairings", type: :request do
       expect(response).to have_http_status(:created)
       expect(token).to start_with("pd_")
       expect(ApiToken.authenticate(token).user).to eq(user)
+    end
+
+    it "broadcasts a browser redirect for the claimed pairing session" do
+      user = create(:user)
+      pairing_session, raw_code = PairingSession.issue_for!(user)
+
+      expect(Turbo::StreamsChannel).to receive(:broadcast_stream_to).with(
+        pairing_session,
+        content: %(<turbo-stream action="redirect" url="/candidate_potholes"></turbo-stream>)
+      )
+
+      post api_v1_pairing_path, params: {
+        pairing: {
+          code: raw_code,
+          device_name: "Pixel 9"
+        }
+      }
     end
 
     it "rejects invalid pairing codes" do

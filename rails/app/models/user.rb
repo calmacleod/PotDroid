@@ -9,4 +9,8 @@ class User < ApplicationRecord
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
   validates :email_address, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+
+  def latest_paired_android_device
+    pairing_sessions.claimed.recently_claimed.first
+  end
 end

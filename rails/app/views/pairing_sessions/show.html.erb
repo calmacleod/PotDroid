@@ -1,4 +1,6 @@
 <div class="page">
+  <%= turbo_stream_from @pairing_session %>
+
   <div class="page-header">
     <div>
       <h1 class="page-title">Pair Android app</h1>
@@ -35,6 +37,10 @@
             <dd class="payload-value"><code><%= @pairing_payload %></code></dd>
           </div>
         </dl>
+      </div>
+
+      <div id="pairing_session_status" class="pairing-wait">
+        Waiting for Android app to claim this pairing code.
       </div>
     </div>
   </section>

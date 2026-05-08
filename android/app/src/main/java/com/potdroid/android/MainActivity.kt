@@ -7,6 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview as CameraXPreview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,19 +21,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +46,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,19 +66,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview as CameraXPreview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.compose.ui.viewinterop.AndroidView
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import com.potdroid.android.data.DebugSettings
 import com.potdroid.android.network.ApiClient
 import com.potdroid.android.network.PairingParser
 import com.potdroid.android.network.PairingPayload
 import com.potdroid.android.network.PairingRequest
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,11 +103,73 @@ fun PotDroidApp(initialPairingInput: String = "") {
     var apiToken by remember { mutableStateOf(settings.apiToken) }
     var pairingInput by remember { mutableStateOf(initialPairingInput) }
     var pairingStatus by remember { mutableStateOf<String?>(null) }
+    var connectivityStatus by remember { mutableStateOf<String?>(null) }
     var hasCameraPermission by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
         hasCameraPermission = grants[Manifest.permission.CAMERA] == true
+    }
+
+    fun saveConnection() {
+        settings.apiBaseUrl = apiBaseUrl
+        settings.apiToken = apiToken
+    }
+
+    fun pairWith(input: String) {
+        pairingInput = input
+        scope.launch {
+            pairingStatus = "Pairing..."
+            connectivityStatus = null
+            val parsedPairing = PairingParser.parse(input, fallbackApiBaseUrl = apiBaseUrl)
+            settings.apiBaseUrl = parsedPairing.apiBaseUrl
+            apiBaseUrl = settings.apiBaseUrl
+
+            runCatching {
+                ApiClient(settings).candidatePotholeApi().claimPairing(
+                    PairingRequest(
+                        pairing = PairingPayload(
+                            code = parsedPairing.code,
+                            deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
+                        )
+                    )
+                )
+            }.onSuccess { response ->
+                if (response.isSuccessful) {
+                    val token = response.body()?.data?.attributes?.apiToken
+                    if (token.isNullOrBlank()) {
+                        pairingStatus = "Pairing response did not include a token."
+                    } else {
+                        settings.apiToken = token
+                        apiToken = token
+                        pairingInput = ""
+                        pairingStatus = "Paired. Long-lived token saved."
+                    }
+                } else {
+                    pairingStatus = "Pairing failed: HTTP ${response.code()}"
+                }
+            }.onFailure { error ->
+                pairingStatus = "Pairing failed: ${error.message ?: error::class.java.simpleName}"
+            }
+        }
+    }
+
+    fun testConnection() {
+        saveConnection()
+        scope.launch {
+            connectivityStatus = "Testing connection..."
+            runCatching {
+                ApiClient(settings).candidatePotholeApi().healthCheck()
+            }.onSuccess { response ->
+                connectivityStatus = if (response.isSuccessful) {
+                    "Connection OK"
+                } else {
+                    "Connection failed: HTTP ${response.code()}"
+                }
+            }.onFailure { error ->
+                connectivityStatus = "Connection failed: ${error.message ?: error::class.java.simpleName}"
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -110,54 +186,33 @@ fun PotDroidApp(initialPairingInput: String = "") {
         apiToken = apiToken,
         pairingInput = pairingInput,
         pairingStatus = pairingStatus,
+        connectivityStatus = connectivityStatus,
         hasCameraPermission = hasCameraPermission,
         onApiBaseUrlChange = { apiBaseUrl = it },
         onApiTokenChange = { apiToken = it },
         onPairingInputChange = { pairingInput = it },
         onSave = {
-            settings.apiBaseUrl = apiBaseUrl
-            settings.apiToken = apiToken
-            pairingStatus = "Connection settings saved."
+            saveConnection()
+            connectivityStatus = "Connection settings saved."
         },
-        onPair = {
-            scope.launch {
-                pairingStatus = "Pairing..."
-                val parsedPairing = PairingParser.parse(pairingInput, fallbackApiBaseUrl = apiBaseUrl)
-                settings.apiBaseUrl = parsedPairing.apiBaseUrl
-                apiBaseUrl = settings.apiBaseUrl
-
-                runCatching {
-                    ApiClient(settings).candidatePotholeApi().claimPairing(
-                        PairingRequest(
-                            pairing = PairingPayload(
-                                code = parsedPairing.code,
-                                deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
-                            )
-                        )
-                    )
-                }.onSuccess { response ->
-                    if (response.isSuccessful) {
-                        val token = response.body()?.data?.attributes?.apiToken
-                        if (token.isNullOrBlank()) {
-                            pairingStatus = "Pairing response did not include a token."
-                        } else {
-                            settings.apiToken = token
-                            apiToken = token
-                            pairingInput = ""
-                            pairingStatus = "Paired. Long-lived token saved."
-                        }
-                    } else {
-                        pairingStatus = "Pairing failed: HTTP ${response.code()}"
-                    }
-                }.onFailure { error ->
-                    pairingStatus = "Pairing failed: ${error.message ?: error::class.java.simpleName}"
-                }
-            }
+        onPair = { pairWith(pairingInput) },
+        onQrScanned = { scannedPayload ->
+            if (apiToken.isBlank() && pairingStatus != "Pairing...") pairWith(scannedPayload)
+        },
+        onTestConnection = { testConnection() },
+        onUnpair = {
+            settings.apiToken = ""
+            apiToken = ""
+            pairingStatus = null
+            connectivityStatus = "Device unpaired."
         },
         onRequestPermissions = {
             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
         },
-        cameraContent = { modifier -> CameraPreview(modifier = modifier) },
+        drivingCameraContent = { modifier -> CameraPreview(modifier = modifier) },
+        qrScannerContent = { modifier, onQrScanned ->
+            QrScannerPreview(modifier = modifier, onQrScanned = onQrScanned)
+        },
     )
 }
 
@@ -167,92 +222,114 @@ fun PotDroidScreen(
     apiToken: String,
     pairingInput: String,
     pairingStatus: String?,
+    connectivityStatus: String?,
     hasCameraPermission: Boolean,
     onApiBaseUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
     onPairingInputChange: (String) -> Unit,
     onSave: () -> Unit,
     onPair: () -> Unit,
+    onQrScanned: (String) -> Unit,
+    onTestConnection: () -> Unit,
+    onUnpair: () -> Unit,
     onRequestPermissions: () -> Unit,
     modifier: Modifier = Modifier,
-    cameraContent: @Composable (Modifier) -> Unit = { cameraModifier ->
+    drivingCameraContent: @Composable (Modifier) -> Unit = { cameraModifier ->
         CameraPreviewPlaceholder(modifier = cameraModifier)
     },
+    qrScannerContent: @Composable (Modifier, (String) -> Unit) -> Unit = { scannerModifier, _ ->
+        QrScannerPlaceholder(modifier = scannerModifier)
+    },
 ) {
-    val cameraShape = RoundedCornerShape(18.dp)
-    val statusColor = when {
-        pairingStatus?.startsWith("Pairing failed") == true -> MaterialTheme.colorScheme.error
-        pairingStatus?.startsWith("Paired") == true -> Color(0xFF0B6B47)
-        pairingStatus.present() -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    if (apiToken.isBlank()) {
+        UnpairedScreen(
+            apiBaseUrl = apiBaseUrl,
+            pairingInput = pairingInput,
+            pairingStatus = pairingStatus,
+            connectivityStatus = connectivityStatus,
+            hasCameraPermission = hasCameraPermission,
+            onApiBaseUrlChange = onApiBaseUrlChange,
+            onPairingInputChange = onPairingInputChange,
+            onPair = onPair,
+            onQrScanned = onQrScanned,
+            onTestConnection = onTestConnection,
+            onRequestPermissions = onRequestPermissions,
+            qrScannerContent = qrScannerContent,
+            modifier = modifier,
+        )
+    } else {
+        DrivingScreen(
+            apiBaseUrl = apiBaseUrl,
+            apiToken = apiToken,
+            connectivityStatus = connectivityStatus,
+            hasCameraPermission = hasCameraPermission,
+            onApiBaseUrlChange = onApiBaseUrlChange,
+            onApiTokenChange = onApiTokenChange,
+            onSave = onSave,
+            onTestConnection = onTestConnection,
+            onUnpair = onUnpair,
+            onRequestPermissions = onRequestPermissions,
+            cameraContent = drivingCameraContent,
+            modifier = modifier,
+        )
     }
+}
 
+@Composable
+private fun UnpairedScreen(
+    apiBaseUrl: String,
+    pairingInput: String,
+    pairingStatus: String?,
+    connectivityStatus: String?,
+    hasCameraPermission: Boolean,
+    onApiBaseUrlChange: (String) -> Unit,
+    onPairingInputChange: (String) -> Unit,
+    onPair: () -> Unit,
+    onQrScanned: (String) -> Unit,
+    onTestConnection: () -> Unit,
+    onRequestPermissions: () -> Unit,
+    qrScannerContent: @Composable (Modifier, (String) -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = "PotDroid",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "Road scan console",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            StatusPill(text = if (apiToken.isBlank()) "Unpaired" else "Ready")
-        }
+        HeaderBlock(title = "Pair PotDroid", subtitle = "Scan the Rails QR code", status = "Unpaired")
 
         ElevatedCard(
             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(20.dp),
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = "Camera",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "Forward-facing scan preview",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    StatusPill(text = if (hasCameraPermission) "Live" else "Permission")
+                    Text("QR scanner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    StatusPill(text = if (hasCameraPermission) "Camera on" else "Permission")
                 }
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 220.dp, max = 320.dp)
-                        .clip(cameraShape)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, cameraShape),
+                        .heightIn(min = 360.dp, max = 460.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp)),
                 ) {
                     if (hasCameraPermission) {
-                        cameraContent(Modifier.fillMaxSize())
+                        qrScannerContent(Modifier.fillMaxSize(), onQrScanned)
+                        ScannerFrame(modifier = Modifier.fillMaxSize())
                     } else {
                         CameraPermissionPlaceholder(
                             modifier = Modifier.fillMaxSize(),
@@ -272,11 +349,6 @@ fun PotDroidScreen(
                 modifier = Modifier.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = "Connection",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
                 OutlinedTextField(
                     value = apiBaseUrl,
                     onValueChange = onApiBaseUrlChange,
@@ -286,43 +358,12 @@ fun PotDroidScreen(
                     singleLine = true,
                 )
                 OutlinedTextField(
-                    value = apiToken,
-                    onValueChange = onApiTokenChange,
-                    label = { Text("Long-lived API token") },
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                )
-                OutlinedButton(
-                    onClick = onSave,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Save connection settings")
-                }
-            }
-        }
-
-        ElevatedCard(
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-            shape = RoundedCornerShape(18.dp),
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    text = "Pairing",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                OutlinedTextField(
                     value = pairingInput,
                     onValueChange = onPairingInputChange,
                     label = { Text("QR payload, deep link, or code") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 96.dp),
+                        .heightIn(min = 90.dp),
                     minLines = 2,
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
@@ -331,41 +372,219 @@ fun PotDroidScreen(
                     onClick = onPair,
                     enabled = pairingInput.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("Pair this device")
+                    Text("Pair device")
                 }
-
-                FilledTonalButton(
-                    onClick = onRequestPermissions,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Review app permissions")
+                OutlinedButton(onClick = onTestConnection, modifier = Modifier.fillMaxWidth()) {
+                    Text("Test Rails connection")
                 }
             }
         }
 
-        if (pairingStatus.present()) {
+        StatusMessage(pairingStatus ?: connectivityStatus)
+    }
+}
+
+@Composable
+private fun DrivingScreen(
+    apiBaseUrl: String,
+    apiToken: String,
+    connectivityStatus: String?,
+    hasCameraPermission: Boolean,
+    onApiBaseUrlChange: (String) -> Unit,
+    onApiTokenChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onTestConnection: () -> Unit,
+    onUnpair: () -> Unit,
+    onRequestPermissions: () -> Unit,
+    cameraContent: @Composable (Modifier) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var settingsOpen by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF070B12))
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+    ) {
+        if (hasCameraPermission) {
+            cameraContent(Modifier.fillMaxSize())
+        } else {
+            CameraPermissionPlaceholder(
+                modifier = Modifier.fillMaxSize(),
+                onRequestPermissions = onRequestPermissions,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x33000000)),
+        )
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = statusColor.copy(alpha = 0.08f),
-                border = BorderStroke(1.dp, statusColor.copy(alpha = 0.24f)),
-                shape = RoundedCornerShape(12.dp),
+                color = Color(0xE60B1220),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(999.dp),
             ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LiveDot()
+                    Text("Scanning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Box {
+                Surface(
+                    color = Color(0xE60B1220),
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(999.dp),
+                ) {
+                    TextButton(onClick = { settingsOpen = true }) {
+                        Text("Settings")
+                    }
+                }
+                DropdownMenu(expanded = settingsOpen, onDismissRequest = { settingsOpen = false }) {
+                    DropdownMenuItem(text = { Text("Test connection") }, onClick = {
+                        settingsOpen = false
+                        onTestConnection()
+                    })
+                    DropdownMenuItem(text = { Text("Unpair device") }, onClick = {
+                        settingsOpen = false
+                        onUnpair()
+                    })
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(12.dp),
+            color = Color(0xE60B1220),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(999.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusPill(text = "Queue ready")
                 Text(
-                    text = pairingStatus.orEmpty(),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    color = statusColor,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
+                    text = connectivityStatus ?: apiBaseUrl.removeSuffix("/"),
+                    color = Color(0xFFCBD5E1),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
                 )
             }
         }
-        Spacer(modifier = Modifier.height(2.dp))
+
+        if (settingsOpen) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(18.dp),
+                shadowElevation = 8.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Connection settings", fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = { settingsOpen = false }) {
+                            Text("Close")
+                        }
+                    }
+                    SettingsFields(
+                        apiBaseUrl = apiBaseUrl,
+                        apiToken = apiToken,
+                        onApiBaseUrlChange = onApiBaseUrlChange,
+                        onApiTokenChange = onApiTokenChange,
+                        onSave = onSave,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsFields(
+    apiBaseUrl: String,
+    apiToken: String,
+    onApiBaseUrlChange: (String) -> Unit,
+    onApiTokenChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = apiBaseUrl,
+            onValueChange = onApiBaseUrlChange,
+            label = { Text("API base URL") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = apiToken,
+            onValueChange = onApiTokenChange,
+            label = { Text("Long-lived API token") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+        )
+        OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+            Text("Save settings")
+        }
     }
 }
 
 private fun String?.present(): Boolean = !isNullOrBlank()
+
+@Composable
+private fun HeaderBlock(title: String, subtitle: String, status: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = subtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        StatusPill(text = status)
+    }
+}
 
 @Composable
 private fun StatusPill(text: String) {
@@ -379,6 +598,55 @@ private fun StatusPill(text: String) {
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun StatusMessage(message: String?) {
+    if (!message.present()) return
+
+    val color = when {
+        message?.startsWith("Pairing failed") == true -> MaterialTheme.colorScheme.error
+        message?.startsWith("Connection failed") == true -> MaterialTheme.colorScheme.error
+        message?.startsWith("Paired") == true -> Color(0xFF0B6B47)
+        message?.startsWith("Connection OK") == true -> Color(0xFF0B6B47)
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = color.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.24f)),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Text(
+            text = message.orEmpty(),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            color = color,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun LiveDot() {
+    Box(
+        modifier = Modifier
+            .size(9.dp)
+            .background(Color(0xFF22C55E), RoundedCornerShape(999.dp)),
+    )
+}
+
+@Composable
+private fun ScannerFrame(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.padding(36.dp), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .border(2.dp, Color.White.copy(alpha = 0.86f), RoundedCornerShape(22.dp)),
         )
     }
 }
@@ -405,7 +673,7 @@ private fun CameraPermissionPlaceholder(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Grant camera and location permissions before road scanning.",
+                text = "Grant camera and location permissions before scanning.",
                 color = Color(0xFFCBD5E1),
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -437,6 +705,80 @@ fun CameraPreview(modifier: Modifier = Modifier) {
                             lifecycleOwner,
                             CameraSelector.DEFAULT_BACK_CAMERA,
                             preview,
+                        )
+                    },
+                    ContextCompat.getMainExecutor(context),
+                )
+            }
+        },
+    )
+}
+
+@androidx.annotation.OptIn(ExperimentalGetImage::class)
+@Composable
+fun QrScannerPreview(
+    onQrScanned: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentOnQrScanned by rememberUpdatedState(onQrScanned)
+
+    AndroidView(
+        modifier = modifier,
+        factory = { viewContext ->
+            PreviewView(viewContext).also { previewView ->
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
+                cameraProviderFuture.addListener(
+                    {
+                        val cameraProvider = cameraProviderFuture.get()
+                        val scanner = BarcodeScanning.getClient(
+                            BarcodeScannerOptions.Builder()
+                                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                                .build()
+                        )
+                        val processing = AtomicBoolean(false)
+                        val preview = CameraXPreview.Builder().build().also {
+                            it.surfaceProvider = previewView.surfaceProvider
+                        }
+                        val analysis = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also { imageAnalysis ->
+                                imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(viewContext)) { imageProxy ->
+                                    if (!processing.compareAndSet(false, true)) {
+                                        imageProxy.close()
+                                        return@setAnalyzer
+                                    }
+
+                                    val mediaImage = imageProxy.image
+                                    if (mediaImage == null) {
+                                        processing.set(false)
+                                        imageProxy.close()
+                                        return@setAnalyzer
+                                    }
+
+                                    val image = InputImage.fromMediaImage(
+                                        mediaImage,
+                                        imageProxy.imageInfo.rotationDegrees,
+                                    )
+                                    scanner.process(image)
+                                        .addOnSuccessListener { barcodes ->
+                                            barcodes.firstNotNullOfOrNull { it.rawValue }?.let(currentOnQrScanned)
+                                        }
+                                        .addOnCompleteListener {
+                                            processing.set(false)
+                                            imageProxy.close()
+                                        }
+                                }
+                            }
+
+                        cameraProvider.unbindAll()
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            analysis,
                         )
                     },
                     ContextCompat.getMainExecutor(context),
@@ -479,6 +821,22 @@ fun CameraPreviewPlaceholder(modifier: Modifier = Modifier) {
 }
 
 @Composable
+fun QrScannerPlaceholder(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.background(Color(0xFF101828)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("QR scanner", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text("Preview mode", color = Color(0xFFCBD5E1), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
 fun PotDroidTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -502,31 +860,9 @@ fun PotDroidTheme(content: @Composable () -> Unit) {
     )
 }
 
-@Preview(name = "PotDroid - Ready", showBackground = true)
+@Preview(name = "PotDroid - Unpaired", showBackground = true)
 @Composable
-private fun PotDroidReadyPreview() {
-    PotDroidTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            PotDroidScreen(
-                apiBaseUrl = "https://example.trycloudflare.com/",
-                apiToken = "pd_preview_token",
-                pairingInput = "",
-                pairingStatus = "Paired. Long-lived token saved.",
-                hasCameraPermission = true,
-                onApiBaseUrlChange = {},
-                onApiTokenChange = {},
-                onPairingInputChange = {},
-                onSave = {},
-                onPair = {},
-                onRequestPermissions = {},
-            )
-        }
-    }
-}
-
-@Preview(name = "PotDroid - Permissions Needed", showBackground = true)
-@Composable
-private fun PotDroidPermissionsPreview() {
+private fun PotDroidUnpairedPreview() {
     PotDroidTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             PotDroidScreen(
@@ -534,12 +870,42 @@ private fun PotDroidPermissionsPreview() {
                 apiToken = "",
                 pairingInput = "potdroid://pair?u=https%3A%2F%2Fexample.trycloudflare.com&c=ABCD-EFGH-JK23",
                 pairingStatus = null,
-                hasCameraPermission = false,
+                connectivityStatus = "Connection OK",
+                hasCameraPermission = true,
                 onApiBaseUrlChange = {},
                 onApiTokenChange = {},
                 onPairingInputChange = {},
                 onSave = {},
                 onPair = {},
+                onQrScanned = {},
+                onTestConnection = {},
+                onUnpair = {},
+                onRequestPermissions = {},
+            )
+        }
+    }
+}
+
+@Preview(name = "PotDroid - Driving", showBackground = true)
+@Composable
+private fun PotDroidDrivingPreview() {
+    PotDroidTheme {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            PotDroidScreen(
+                apiBaseUrl = "https://example.trycloudflare.com/",
+                apiToken = "pd_preview_token",
+                pairingInput = "",
+                pairingStatus = "Paired. Long-lived token saved.",
+                connectivityStatus = null,
+                hasCameraPermission = true,
+                onApiBaseUrlChange = {},
+                onApiTokenChange = {},
+                onPairingInputChange = {},
+                onSave = {},
+                onPair = {},
+                onQrScanned = {},
+                onTestConnection = {},
+                onUnpair = {},
                 onRequestPermissions = {},
             )
         }
