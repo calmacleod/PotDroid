@@ -9,7 +9,7 @@
     <div class="button-group">
       <%= link_to "Back", candidate_potholes_path, class: "button" %>
       <%= link_to "Map", map_candidate_potholes_path(status: @candidate_pothole.status), class: "button" %>
-      <span class="badge status-<%= @candidate_pothole.status %>"><%= @candidate_pothole.status.humanize %></span>
+      <span class="<%= status_badge_class(@candidate_pothole.status) %>"><%= @candidate_pothole.status.humanize %></span>
     </div>
   </div>
 
@@ -17,7 +17,7 @@
     <div class="image-stage">
       <% if @candidate_pothole.image.attached? %>
         <div class="detection-image-frame">
-          <%= image_tag @candidate_pothole.image, class: "hero-image" %>
+          <%= image_tag @candidate_pothole.image, class: "hero-image", alt: "Candidate pothole capture" %>
           <%= candidate_bounding_box(@candidate_pothole) %>
           <%= detector_validation_bounding_box(@detector_validation_result) %>
         </div>
@@ -66,7 +66,7 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Image validation</h2>
-          <span class="badge validation-<%= @candidate_pothole.image_validation_status %>"><%= @candidate_pothole.image_validation_status.humanize %></span>
+          <span class="<%= validation_badge_class(@candidate_pothole.image_validation_status) %>"><%= @candidate_pothole.image_validation_status.humanize %></span>
         </div>
         <div class="panel-body">
           <dl class="definition-list">
@@ -106,7 +106,7 @@
           <div class="panel-header">
             <h2 class="panel-title">Detector validation</h2>
             <% if @detector_validation_result.present? %>
-              <span class="badge status-<%= @detector_validation_result["detected"] ? "confirmed" : "rejected" %>"><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></span>
+              <span class="<%= detector_result_badge_class(@detector_validation_result) %>"><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></span>
             <% else %>
               <span class="badge status-failed">Failed</span>
             <% end %>
@@ -131,7 +131,7 @@
         <div class="panel-header">
           <h2 class="panel-title">City submission</h2>
           <% if submission = @candidate_pothole.city_submission %>
-            <span class="badge status-<%= submission.status %>"><%= submission.status.humanize %></span>
+            <span class="<%= status_badge_class(submission.status) %>"><%= submission.status.humanize %></span>
           <% else %>
             <span class="badge">Not submitted</span>
           <% end %>

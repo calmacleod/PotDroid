@@ -1,4 +1,24 @@
 module ApplicationHelper
+  def status_badge_class(status)
+    class_names("badge", "status-#{status}")
+  end
+
+  def validation_badge_class(status)
+    class_names("badge", "validation-#{status}")
+  end
+
+  def detector_result_badge_class(result)
+    status_badge_class(result["detected"] ? "confirmed" : "rejected")
+  end
+
+  def pairing_qr_svg(pairing_session, raw_code:, api_base_url:)
+    sanitize(
+      pairing_session.qr_svg(raw_code: raw_code, api_base_url: api_base_url),
+      tags: %w[svg rect path],
+      attributes: %w[xmlns width height viewBox shape-rendering role aria-label fill d]
+    )
+  end
+
   def candidate_bounding_box(candidate)
     detection_bounding_box(candidate.bounding_box)
   end

@@ -42,8 +42,8 @@ jobs:
       - name: Prepare database
         run: bin/rails db:test:prepare
 
-      - name: Run RSpec
-        run: bundle exec rspec
+      - name: Run Rails tests
+        run: bin/rails test
 
   lint:
     runs-on: ubuntu-latest
@@ -60,6 +60,9 @@ jobs:
 
       - name: RuboCop
         run: bundle exec rubocop -f github
+
+      - name: Herb
+        run: bundle exec herb lint
 
   security:
     runs-on: ubuntu-latest

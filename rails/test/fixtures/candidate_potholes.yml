@@ -1,0 +1,51 @@
+pending:
+  user: one
+  status: 0
+  latitude: 45.421500
+  longitude: -75.697200
+  heading: 180.0
+  speed: 12.5
+  detector_confidence: 0.9100
+  detector_model_version: fake-detector-v1
+  bounding_box:
+    left: 0.1
+    top: 0.2
+    right: 0.4
+    bottom: 0.5
+  captured_at: <%= Time.zone.parse("2026-05-08 08:45:29") %>
+  image_validation_status: 0
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+confirmed:
+  user: one
+  reviewed_by: one
+  status: 1
+  latitude: 45.422000
+  longitude: -75.698000
+  heading: 175.0
+  speed: 10.0
+  detector_confidence: 0.8800
+  detector_model_version: fake-detector-v1
+  bounding_box:
+    left: 0.12
+    top: 0.22
+    right: 0.42
+    bottom: 0.52
+  captured_at: <%= Time.zone.parse("2026-05-08 09:45:29") %>
+  reviewed_at: <%= 10.minutes.ago %>
+  image_validation_status: 0
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+other_user_pending:
+  user: two
+  status: 0
+  latitude: 45.431500
+  longitude: -75.707200
+  detector_confidence: 0.7200
+  detector_model_version: fake-detector-v1
+  captured_at: <%= Time.zone.parse("2026-05-08 10:45:29") %>
+  image_validation_status: 0
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>

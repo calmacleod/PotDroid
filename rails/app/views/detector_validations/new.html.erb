@@ -33,7 +33,7 @@
           <div class="panel-header">
             <h2 class="panel-title">Result</h2>
             <% if @detector_validation_result.present? %>
-              <span class="badge status-<%= @detector_validation_result["detected"] ? "confirmed" : "rejected" %>"><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></span>
+              <span class="<%= detector_result_badge_class(@detector_validation_result) %>"><%= @detector_validation_result["detected"] ? "Detected" : "Missed" %></span>
             <% else %>
               <span class="badge status-failed">Failed</span>
             <% end %>

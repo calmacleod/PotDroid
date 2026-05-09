@@ -1,6 +1,6 @@
 <% content_for :head do %>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.10.0/mapbox-gl.js" nonce="<%= request.content_security_policy_nonce %>"></script>
 <% end %>
 
 <% map_candidates = @candidate_potholes.map do |candidate|
@@ -69,15 +69,15 @@ end %>
     </aside>
   </section>
 
-  <script type="application/json" id="candidate-map-data"><%= raw json_escape(map_candidates.to_json) %></script>
-  <%= javascript_tag nonce: true do %>
+  <template id="candidate-map-data"><%= json_escape(map_candidates.to_json) %></template>
+  <script nonce="<%= request.content_security_policy_nonce %>">
     (() => {
       const mapEl = document.getElementById("candidate-map");
       const inspectorEl = document.getElementById("candidate-map-inspector");
       const dataEl = document.getElementById("candidate-map-data");
       if (!mapEl || !inspectorEl || !dataEl || typeof mapboxgl === "undefined") return;
 
-      const candidates = JSON.parse(dataEl.textContent);
+      const candidates = JSON.parse(dataEl.content.textContent);
       const token = mapEl.dataset.mapboxToken;
       if (!token) return;
 
@@ -374,5 +374,5 @@ end %>
         return element;
       }
     })();
-  <% end %>
+  </script>
 </div>

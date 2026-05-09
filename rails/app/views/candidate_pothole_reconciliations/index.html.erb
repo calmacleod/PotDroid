@@ -29,7 +29,7 @@
                   <div class="candidate-card-media">
                     <% if candidate.image.attached? %>
                       <div class="detection-thumb-frame reconciliation-thumb">
-                        <%= image_tag candidate.image.variant(:thumb), class: "thumbnail" %>
+                        <%= image_tag candidate.image.variant(:thumb), class: "thumbnail", alt: "Candidate pothole capture" %>
                         <%= candidate_bounding_box(candidate) %>
                       </div>
                     <% else %>

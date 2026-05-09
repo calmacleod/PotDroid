@@ -1,0 +1,9 @@
+linter:
+  enabled: true
+  failLevel: error
+  exclude:
+    - "app/assets/builds/**/*"
+    - "public/**/*"
+
+formatter:
+  enabled: false

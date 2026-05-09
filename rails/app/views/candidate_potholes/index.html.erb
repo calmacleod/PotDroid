@@ -48,7 +48,7 @@
               <%= link_to candidate do %>
                 <% if candidate.image.attached? %>
                   <span class="detection-thumb-frame">
-                    <%= image_tag candidate.image.variant(:thumb), class: "thumbnail" %>
+                    <%= image_tag candidate.image.variant(:thumb), class: "thumbnail", alt: "Candidate pothole capture" %>
                     <%= candidate_bounding_box(candidate) %>
                   </span>
                 <% else %>
@@ -56,8 +56,8 @@
                 <% end %>
               <% end %>
             </td>
-            <td><span class="badge status-<%= candidate.status %>"><%= candidate.status.humanize %></span></td>
-            <td><span class="badge validation-<%= candidate.image_validation_status %>"><%= candidate.image_validation_status.humanize %></span></td>
+            <td><span class="<%= status_badge_class(candidate.status) %>"><%= candidate.status.humanize %></span></td>
+            <td><span class="<%= validation_badge_class(candidate.image_validation_status) %>"><%= candidate.image_validation_status.humanize %></span></td>
             <td class="metric"><%= number_to_percentage(candidate.detector_confidence.to_f * 100, precision: 1) %></td>
             <td class="mono subtle"><%= candidate.detector_model_version.presence || "unknown" %></td>
             <td class="mono">

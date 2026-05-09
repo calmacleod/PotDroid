@@ -1,0 +1,7 @@
+queued:
+  city_submission: pending
+  event_type: submit
+  payload: {}
+  message: queued
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>

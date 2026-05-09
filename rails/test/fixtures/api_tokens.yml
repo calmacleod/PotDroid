@@ -1,0 +1,9 @@
+<% fixture_raw_token = "pd_fixturetoken#{'a' * 49}" %>
+
+android:
+  user: one
+  name: Android device
+  token_digest: <%= BCrypt::Password.create(fixture_raw_token) %>
+  token_prefix: <%= fixture_raw_token.first(ApiToken::TOKEN_PREFIX_LENGTH) %>
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>

@@ -1,0 +1,7 @@
+pending:
+  candidate_pothole: confirmed
+  connector: ottawa_open311
+  status: 0
+  response_payload: {}
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>

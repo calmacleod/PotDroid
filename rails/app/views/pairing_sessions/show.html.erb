@@ -18,7 +18,7 @@
       <div class="split-panel pairing-panel">
         <div class="qr-column">
           <div class="qr-wrap">
-            <%= @pairing_session.qr_svg(raw_code: @raw_code, api_base_url: @api_base_url).html_safe %>
+            <%= pairing_qr_svg(@pairing_session, raw_code: @raw_code, api_base_url: @api_base_url) %>
           </div>
           <p class="qr-caption">Scan from the Android app pairing screen.</p>
         </div>

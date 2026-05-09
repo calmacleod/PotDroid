@@ -1,0 +1,16 @@
+active:
+  user: one
+  code_digest: <%= BCrypt::Password.create(PairingSession.normalize_code("ABCD-EFGH-JK23")) %>
+  expires_at: <%= 15.minutes.from_now %>
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
+
+claimed:
+  user: one
+  api_token: android
+  code_digest: <%= BCrypt::Password.create(PairingSession.normalize_code("WXYZ-2345-6789")) %>
+  expires_at: <%= 15.minutes.from_now %>
+  claimed_at: <%= 2.minutes.ago %>
+  device_name: Pixel 9
+  created_at: <%= Time.current %>
+  updated_at: <%= Time.current %>
