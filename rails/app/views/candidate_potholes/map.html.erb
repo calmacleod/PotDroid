@@ -35,9 +35,8 @@ end %>
 
   <div class="toolbar">
     <nav class="segmented" aria-label="Candidate status filters">
-    <% [["All", nil], ["Pending", "pending_review"], ["Confirmed", "confirmed"], ["Rejected", "rejected"], ["Submitted", "submitted"], ["Closed", "closed"], ["Duplicates", "duplicate"]].each do |label, status| %>
-      <% active = @status == status || (@status.blank? && status.nil?) %>
-      <% count = status ? @status_counts.fetch(status, 0) : @candidate_total %>
+    <% [["Review queue", "review", @review_count], ["Pending", "pending_review", @status_counts.fetch("pending_review", 0)], ["Confirmed", "confirmed", @status_counts.fetch("confirmed", 0)], ["Rejected", "rejected", @status_counts.fetch("rejected", 0)], ["Submitted", "submitted", @status_counts.fetch("submitted", 0)], ["Closed", "closed", @status_counts.fetch("closed", 0)]].each do |label, status, count| %>
+      <% active = @status == status %>
       <%= link_to map_candidate_potholes_path(status: status), class: "segment #{active ? "active" : ""}" do %>
         <span><%= label %></span>
         <span class="segment-count"><%= count %></span>
@@ -163,7 +162,6 @@ end %>
               "submitted", "#0f7a4f",
               "closed", "#0f7a4f",
               "rejected", "#b42318",
-              "duplicate", "#b42318",
               "#9a6700"
             ],
             "circle-radius": 9,

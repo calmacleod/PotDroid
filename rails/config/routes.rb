@@ -16,7 +16,6 @@ Rails.application.routes.draw do
       post :revalidate_image
     end
   end
-  resources :candidate_pothole_reconciliations, only: %i[ index create ]
   resource :detector_validation, only: %i[ new create ]
   resources :api_tokens, only: %i[ create ]
   resources :pairing_sessions, only: %i[ show create ]

@@ -53,9 +53,6 @@
           <div class="definition-row"><dt>Captured</dt><dd class="mono"><%= l @candidate_pothole.captured_at, format: :short %></dd></div>
           <div class="definition-row"><dt>Coordinates</dt><dd class="mono"><%= @candidate_pothole.latitude %>, <%= @candidate_pothole.longitude %></dd></div>
           <div class="definition-row"><dt>Bounding box</dt><dd class="mono"><%= @candidate_pothole.bounding_box.presence || "none" %></dd></div>
-          <% if @candidate_pothole.duplicate_of.present? %>
-            <div class="definition-row"><dt>Duplicate of</dt><dd><%= link_to "Candidate ##{@candidate_pothole.duplicate_of_id}", @candidate_pothole.duplicate_of, class: "link" %></dd></div>
-          <% end %>
         </dl>
         <div class="panel-actions">
           <%= link_to "Open map", "https://www.google.com/maps/search/?api=1&query=#{@candidate_pothole.latitude},#{@candidate_pothole.longitude}", target: "_blank", rel: "noopener", class: "button" %>

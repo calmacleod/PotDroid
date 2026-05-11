@@ -1,78 +1,86 @@
-<div class="page">
-  <div class="page-header">
+<% status_filters = [["Review queue", "review", @review_count], ["Pending", "pending_review", @status_counts.fetch("pending_review", 0)], ["Confirmed", "confirmed", @status_counts.fetch("confirmed", 0)], ["Rejected", "rejected", @status_counts.fetch("rejected", 0)], ["Submitted", "submitted", @status_counts.fetch("submitted", 0)], ["Closed", "closed", @status_counts.fetch("closed", 0)]] %>
+
+<div class="page candidates-page">
+  <div class="review-header">
     <div>
-      <h1 class="page-title">Candidate potholes</h1>
-      <p class="page-kicker">Review detections uploaded from Android. Newest captures are first.</p>
+      <h1 class="page-title">Pothole review</h1>
+      <p class="page-kicker">Review pending and confirmed detections directly from the queue.</p>
     </div>
-    <div class="button-group">
-      <%= link_to "Map view", map_candidate_potholes_path(status: @status), class: "button" %>
-      <%= link_to "Reconcile duplicates", candidate_pothole_reconciliations_path, class: "button" %>
-      <%= link_to "API docs", "/api-docs", class: "button" %>
-      <%= button_to "Pair Android app", pairing_sessions_path, class: "button primary" %>
-    </div>
+    <p class="review-visible-count"><span class="metric"><%= @candidate_potholes.size %></span> visible</p>
   </div>
 
-  <div class="toolbar">
-    <nav class="segmented" aria-label="Candidate status filters">
-    <% [["All", nil], ["Pending", "pending_review"], ["Confirmed", "confirmed"], ["Rejected", "rejected"], ["Submitted", "submitted"], ["Closed", "closed"], ["Duplicates", "duplicate"]].each do |label, status| %>
-      <% active = @status == status || (@status.blank? && status.nil?) %>
-        <% count = status ? @status_counts.fetch(status, 0) : @candidate_total %>
-        <%= link_to candidate_potholes_path(status: status), class: "segment #{active ? "active" : ""}" do %>
+  <nav class="review-tabs" aria-label="Candidate status filters">
+    <% status_filters.each do |label, status, count| %>
+      <%= link_to candidate_potholes_path(status: status), class: "review-tab #{status == @status ? "active" : ""}" do %>
+        <span class="review-tab-label">
           <span><%= label %></span>
-          <span class="segment-count"><%= count %></span>
-        <% end %>
+          <span class="review-tab-count"><%= count %></span>
+        </span>
+      <% end %>
     <% end %>
-    </nav>
-    <div class="muted"><span class="metric"><%= @candidate_potholes.size %></span> visible</div>
-  </div>
+  </nav>
 
-  <div class="data-panel">
-    <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Image</th>
-          <th>Status</th>
-          <th>Image validation</th>
-          <th>Confidence</th>
-          <th>Model</th>
-          <th>Location</th>
-          <th>Captured</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @candidate_potholes.each do |candidate| %>
-          <tr>
-            <td>
-              <%= link_to candidate do %>
-                <% if candidate.image.attached? %>
-                  <span class="detection-thumb-frame">
-                    <%= image_tag candidate.image.variant(:thumb), class: "thumbnail", alt: "Candidate pothole capture" %>
-                    <%= candidate_bounding_box(candidate) %>
-                  </span>
-                <% else %>
-                  <div class="placeholder-thumb"></div>
-                <% end %>
+  <% if @candidate_potholes.any? %>
+    <section class="candidate-feed" aria-label="Candidate potholes">
+      <% @candidate_potholes.each do |candidate| %>
+        <% bump_detected = candidate.accelerometer_data&.dig("bump_detected") %>
+        <% return_path = candidate_potholes_path(status: @status) %>
+        <article class="candidate-row">
+          <%= link_to candidate, class: "candidate-media" do %>
+            <% if candidate.image.attached? %>
+              <span class="detection-thumb-frame candidate-thumb">
+                <%= image_tag candidate.image.variant(:thumb), class: "thumbnail", alt: "" %>
+                <%= candidate_bounding_box(candidate) %>
+              </span>
+            <% else %>
+              <span class="placeholder-thumb candidate-thumb"></span>
+            <% end %>
+          <% end %>
+
+          <div class="candidate-main">
+            <div class="candidate-title-row">
+              <div>
+                <h2 class="candidate-title"><%= link_to "Candidate ##{candidate.id}", candidate, class: "link-plain" %></h2>
+                <p class="candidate-subtitle mono"><%= l candidate.captured_at, format: :short %></p>
+              </div>
+            </div>
+
+            <dl class="candidate-metrics">
+              <div>
+                <dt>Confidence</dt>
+                <dd class="metric"><%= number_to_percentage(candidate.detector_confidence.to_f * 100, precision: 1) %></dd>
+              </div>
+              <div>
+                <dt>Validation</dt>
+                <dd><span class="<%= validation_badge_class(candidate.image_validation_status) %>"><%= candidate.image_validation_status.humanize %></span></dd>
+              </div>
+              <div>
+                <dt>Sensor</dt>
+                <dd><%= bump_detected.nil? ? "No data" : (bump_detected ? "Bump detected" : "Quiet") %></dd>
+              </div>
+              <div>
+                <dt>Location</dt>
+                <dd class="mono"><%= link_to "#{candidate.latitude}, #{candidate.longitude}", "https://www.google.com/maps/search/?api=1&query=#{candidate.latitude},#{candidate.longitude}", target: "_blank", rel: "noopener", class: "link" %></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="candidate-actions">
+            <span class="<%= status_badge_class(candidate.status) %>"><%= candidate.status.humanize %></span>
+            <div class="candidate-action-controls">
+              <% if candidate.pending_review? %>
+                <%= button_to "Confirm", confirm_candidate_pothole_path(candidate), method: :patch, params: { return_to: return_path }, class: "button success compact-action" %>
+                <%= button_to "Reject", reject_candidate_pothole_path(candidate), method: :patch, params: { return_to: return_path }, class: "button danger compact-action" %>
+              <% elsif candidate.confirmed? %>
+                <%= button_to "Reject", reject_candidate_pothole_path(candidate), method: :patch, params: { return_to: return_path }, class: "button danger compact-action" %>
               <% end %>
-            </td>
-            <td><span class="<%= status_badge_class(candidate.status) %>"><%= candidate.status.humanize %></span></td>
-            <td><span class="<%= validation_badge_class(candidate.image_validation_status) %>"><%= candidate.image_validation_status.humanize %></span></td>
-            <td class="metric"><%= number_to_percentage(candidate.detector_confidence.to_f * 100, precision: 1) %></td>
-            <td class="mono subtle"><%= candidate.detector_model_version.presence || "unknown" %></td>
-            <td class="mono">
-              <%= link_to "#{candidate.latitude}, #{candidate.longitude}", "https://www.google.com/maps/search/?api=1&query=#{candidate.latitude},#{candidate.longitude}", target: "_blank", rel: "noopener", class: "link" %>
-            </td>
-            <td class="mono"><%= l candidate.captured_at, format: :short %></td>
-            <td><%= link_to "Open", candidate, class: "button" %></td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-    </div>
-
-    <% if @candidate_potholes.empty? %>
-      <div class="empty-state">No candidate potholes match this filter.</div>
-    <% end %>
-  </div>
+              <%= link_to "Details", candidate, class: "button compact-action" %>
+            </div>
+          </div>
+        </article>
+      <% end %>
+    </section>
+  <% else %>
+    <div class="empty-state">No candidate potholes match this filter.</div>
+  <% end %>
 </div>

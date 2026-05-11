@@ -11,8 +11,12 @@ class CandidatePotholesTest < ActionDispatch::IntegrationTest
     get candidate_potholes_path
 
     assert_response :ok
-    assert_includes response.body, "Candidate potholes"
+    assert_includes response.body, "Pothole review"
     assert_match(/fake-detector-v1|91.0%/, response.body)
+    assert_includes response.body, "Confirm"
+    assert_includes response.body, "Reject"
+    assert_equal 1, response.body.scan(%r{/candidate_potholes/\d+/confirm}).size
+    assert_no_match(/Reconcile|Duplicates/, response.body)
   end
 
   test "shows the stored bounding box on the candidate image" do
@@ -136,6 +140,23 @@ class CandidatePotholesTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to @candidate
     assert @candidate.reload.rejected?
+  end
+
+  test "inline review actions return to the filtered list" do
+    other_pending = create_candidate_pothole!(
+      user: @user,
+      latitude: 45.421600,
+      longitude: -75.697300,
+      captured_at: Time.zone.parse("2026-05-08 12:01:00")
+    )
+
+    patch confirm_candidate_pothole_path(other_pending), params: { return_to: candidate_potholes_path(status: "review") }
+    assert_redirected_to candidate_potholes_path(status: "review")
+    assert other_pending.reload.confirmed?
+
+    patch reject_candidate_pothole_path(other_pending), params: { return_to: candidate_potholes_path(status: "review") }
+    assert_redirected_to candidate_potholes_path(status: "review")
+    assert other_pending.reload.rejected?
   end
 
   private

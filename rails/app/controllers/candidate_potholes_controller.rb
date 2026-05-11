@@ -1,18 +1,19 @@
 class CandidatePotholesController < ApplicationController
   before_action :set_candidate_pothole, only: %i[ show confirm reject submit validate_detector revalidate_image ]
+  DISPLAY_STATUSES = %w[ review pending_review confirmed rejected submitted closed ].freeze
 
   def index
-    @status = params[:status]
-    @candidate_potholes = Current.user.candidate_potholes.with_attached_image.with_status(@status).recent_first
-    @status_counts = Current.user.candidate_potholes.group(:status).count
-    @candidate_total = @status_counts.values.sum
+    @status = normalized_status
+    @status_counts = visible_candidates.group(:status).count
+    @review_count = @status_counts.fetch("pending_review", 0) + @status_counts.fetch("confirmed", 0)
+    @candidate_potholes = filtered_candidates.with_attached_image.recent_first
   end
 
   def map
-    @status = params[:status]
-    @candidate_potholes = Current.user.candidate_potholes.with_attached_image.includes(:city_submission).with_status(@status).recent_first
-    @status_counts = Current.user.candidate_potholes.group(:status).count
-    @candidate_total = @status_counts.values.sum
+    @status = normalized_status
+    @status_counts = visible_candidates.group(:status).count
+    @review_count = @status_counts.fetch("pending_review", 0) + @status_counts.fetch("confirmed", 0)
+    @candidate_potholes = filtered_candidates.with_attached_image.includes(:city_submission).recent_first
     @mapbox_access_token = ENV["MAPBOX_ACCESS_TOKEN"].to_s
   end
 
@@ -23,12 +24,12 @@ class CandidatePotholesController < ApplicationController
 
   def confirm
     @candidate_pothole.confirm!(reviewer: Current.user)
-    redirect_to @candidate_pothole, notice: "Candidate pothole confirmed."
+    redirect_to review_return_path, notice: "Candidate pothole confirmed."
   end
 
   def reject
     @candidate_pothole.reject!(reviewer: Current.user)
-    redirect_to @candidate_pothole, notice: "Candidate pothole rejected."
+    redirect_to review_return_path, notice: "Candidate pothole rejected."
   end
 
   def submit
@@ -53,6 +54,31 @@ class CandidatePotholesController < ApplicationController
   end
 
   private
+
+  def normalized_status
+    requested_status = params[:status].presence || "review"
+    DISPLAY_STATUSES.include?(requested_status) ? requested_status : "review"
+  end
+
+  def filtered_candidates
+    case @status
+    when "review"
+      visible_candidates.where(status: %i[ pending_review confirmed ])
+    else
+      visible_candidates.with_status(@status)
+    end
+  end
+
+  def visible_candidates
+    Current.user.candidate_potholes.where.not(status: :duplicate)
+  end
+
+  def review_return_path
+    return @candidate_pothole if params[:return_to].blank?
+    return params[:return_to] if params[:return_to].start_with?("/") && !params[:return_to].start_with?("//")
+
+    @candidate_pothole
+  end
 
   def set_candidate_pothole
     @candidate_pothole = Current.user.candidate_potholes.find(params[:id])
