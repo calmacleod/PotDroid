@@ -67,12 +67,32 @@ Multipart field names:
 - `candidate_pothole[detector_confidence]`
 - `candidate_pothole[detector_model_version]`
 - `candidate_pothole[captured_at]`
+- `candidate_pothole[accelerometer_data]` optional JSON string
 - `candidate_pothole[bounding_box][left]`
 - `candidate_pothole[bounding_box][top]`
 - `candidate_pothole[bounding_box][right]`
 - `candidate_pothole[bounding_box][bottom]`
 
-Successful responses return `201 Created` with the candidate id, status, metadata, image URL, image validation state, and city submission state when present. Rails enqueues an async image reliability validation job after the upload is stored. The job runs the local detector against the original image plus transformed versions of the image. Candidates remain reviewable only when every validation check detects the pothole at or above the server threshold; failed reliability checks automatically move the candidate to `rejected`.
+`accelerometer_data` contains a rolling sensor window captured around the detector event:
+
+```json
+{
+  "sensor_type": "linear_acceleration",
+  "sensor_name": "Pixel linear acceleration",
+  "includes_gravity": false,
+  "sample_rate_hz": 48.5,
+  "window_start_elapsed_millis": 1000,
+  "window_end_elapsed_millis": 1900,
+  "peak_magnitude": 7.2,
+  "bump_threshold": 5.0,
+  "bump_detected": true,
+  "samples": [
+    { "elapsed_millis": 1000, "x": 0.1, "y": 0.2, "z": 1.1, "magnitude": 1.12 }
+  ]
+}
+```
+
+Successful responses return `201 Created` with the candidate id, status, metadata, accelerometer data, image URL, image validation state, and city submission state when present. Rails enqueues an async image reliability validation job after the upload is stored. The job runs the local detector against the original image plus transformed versions of the image. Candidates remain reviewable only when every validation check detects the pothole at or above the server threshold; failed reliability checks automatically move the candidate to `rejected`.
 
 ## Validate Image Against Local Detector
 

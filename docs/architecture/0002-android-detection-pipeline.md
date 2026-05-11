@@ -22,5 +22,6 @@ Each candidate stores:
 - detector confidence
 - model version
 - bounding box
+- accelerometer data window captured around the detector event
 - capture timestamp
 - upload status and remote API id

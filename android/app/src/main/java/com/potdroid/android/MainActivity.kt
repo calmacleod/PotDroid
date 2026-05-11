@@ -57,6 +57,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,6 +85,8 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.potdroid.android.data.AccelerometerDisplayState
+import com.potdroid.android.data.AccelerometerMonitor
 import com.potdroid.android.data.DebugSettings
 import com.potdroid.android.data.CandidateRepository
 import com.potdroid.android.data.LocationProvider
@@ -95,8 +98,10 @@ import com.potdroid.android.network.PairingRequest
 import com.potdroid.android.vision.BoundingBox
 import com.potdroid.android.vision.TflitePotholeDetector
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.Executors
@@ -877,6 +882,8 @@ fun CameraPreview(
         )
     }
     val locationProvider = remember(context) { LocationProvider(context.applicationContext) }
+    val accelerometerMonitor = remember(context) { AccelerometerMonitor(context.applicationContext) }
+    val accelerometerState by accelerometerMonitor.state.collectAsState()
     val processing = remember { AtomicBoolean(false) }
     val modelErrorReported = remember { AtomicBoolean(false) }
     val lastSavedAtMillis = remember { AtomicLong(0) }
@@ -885,13 +892,15 @@ fun CameraPreview(
     val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
     var detectedBoundingBox by remember { mutableStateOf<BoundingBox?>(null) }
 
-    DisposableEffect(detectorResult, analyzerExecutor) {
+    DisposableEffect(detectorResult, analyzerExecutor, accelerometerMonitor) {
+        accelerometerMonitor.start()
         if (detectorResult.isSuccess) {
             currentOnLog("Model loaded")
         } else {
             currentOnLog("Model failed: ${detectorResult.exceptionOrNull()?.javaClass?.simpleName ?: "unknown"}")
         }
         onDispose {
+            accelerometerMonitor.stop()
             detectorResult.getOrNull()?.close()
             analyzerExecutor.shutdown()
         }
@@ -968,6 +977,7 @@ fun CameraPreview(
 
                                                 lastSavedAtMillis.set(now)
                                                 scope.launch {
+                                                    delay(ACCELEROMETER_POST_DETECTION_CAPTURE_DELAY_MS)
                                                     val location = withContext(Dispatchers.IO) { locationProvider.currentLocation() }
                                                     if (location == null) {
                                                         currentOnStatusChange("Location needed")
@@ -984,6 +994,7 @@ fun CameraPreview(
                                                                 longitude = location.longitude,
                                                                 heading = location.heading,
                                                                 speed = location.speed,
+                                                                accelerometerSnapshot = accelerometerMonitor.snapshot(),
                                                             )
                                                         }
                                                     }.onSuccess {
@@ -1019,10 +1030,17 @@ fun CameraPreview(
             },
         )
         DetectionBoxOverlay(boundingBox = detectedBoundingBox, modifier = Modifier.fillMaxSize())
+        AccelerometerOverlay(
+            state = accelerometerState,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp),
+        )
     }
 }
 
 private const val DETECTION_SAVE_COOLDOWN_MS = 5_000L
+private const val ACCELEROMETER_POST_DETECTION_CAPTURE_DELAY_MS = 900L
 private const val DETECTION_BOX_HOLD_MS = 750L
 private const val DETECTION_LOG_COOLDOWN_MS = 1_000L
 private const val MAX_SCANNER_LOG_LINES = 6
@@ -1034,6 +1052,58 @@ private val ANALYSIS_RESOLUTION_SELECTOR = ResolutionSelector.Builder()
         )
     )
     .build()
+
+@Composable
+private fun AccelerometerOverlay(
+    state: AccelerometerDisplayState,
+    modifier: Modifier = Modifier,
+) {
+    val magnitudes = state.recentMagnitudes
+    val peak = state.peakMagnitude.coerceAtLeast(1f)
+
+    Column(
+        modifier = modifier
+            .width(190.dp)
+            .background(Color(0x660B1220), RoundedCornerShape(6.dp))
+            .border(BorderStroke(1.dp, Color(0x55FFFFFF)), RoundedCornerShape(6.dp))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = if (state.available) state.sensorType else "No accelerometer",
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "X ${state.x.sensorValue()}  Y ${state.y.sensorValue()}  Z ${state.z.sensorValue()}",
+            color = Color(0xFFE2E8F0),
+            style = MaterialTheme.typography.labelSmall,
+        )
+        Text(
+            text = "Magnitude ${state.magnitude.sensorValue()}  Peak ${state.peakMagnitude.sensorValue()}",
+            color = Color(0xFFE2E8F0),
+            style = MaterialTheme.typography.labelSmall,
+        )
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp),
+        ) {
+            if (magnitudes.size < 2) return@Canvas
+
+            val step = size.width / (magnitudes.size - 1)
+            magnitudes.zipWithNext().forEachIndexed { index, (previous, current) ->
+                drawLine(
+                    color = Color(0xFF38BDF8),
+                    start = Offset(index * step, size.height - ((previous / peak).coerceIn(0f, 1f) * size.height)),
+                    end = Offset((index + 1) * step, size.height - ((current / peak).coerceIn(0f, 1f) * size.height)),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun DetectionBoxOverlay(
@@ -1070,6 +1140,8 @@ private fun ImageProxy.toUprightBitmap(): Bitmap {
     val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
     return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
+
+private fun Float.sensorValue(): String = String.format(Locale.US, "%.1f", this)
 
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 @Composable

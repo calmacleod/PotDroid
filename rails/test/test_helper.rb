@@ -95,6 +95,16 @@ module ActiveSupport
           detector_confidence: "0.91",
           detector_model_version: "fake-detector-v1",
           bounding_box: { "left" => 0.1, "top" => 0.2, "right" => 0.4, "bottom" => 0.5 },
+          accelerometer_data: {
+            "sensor_type" => "linear_acceleration",
+            "sample_rate_hz" => 50.0,
+            "peak_magnitude" => 6.4,
+            "bump_threshold" => 5.0,
+            "bump_detected" => true,
+            "samples" => [
+              { "elapsed_millis" => 1_000, "x" => 0.1, "y" => 0.2, "z" => 6.4, "magnitude" => 6.4 }
+            ]
+          },
           captured_at: Time.zone.parse("2026-05-08 08:45:29")
         }.merge(attributes)
       end

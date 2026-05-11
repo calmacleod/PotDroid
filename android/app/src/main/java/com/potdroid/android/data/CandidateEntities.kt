@@ -26,6 +26,7 @@ data class CandidatePotholeEntity(
     val boundingBoxRight: Float,
     val boundingBoxBottom: Float,
     val capturedAtMillis: Long,
+    val accelerometerData: String? = null,
     val uploadStatus: UploadStatus = UploadStatus.Pending,
     val remoteId: Long? = null,
     val lastError: String? = null,

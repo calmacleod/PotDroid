@@ -2,6 +2,7 @@ package com.potdroid.android.network
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -31,6 +32,7 @@ interface CandidatePotholeApi {
         @Part("candidate_pothole[detector_confidence]") detectorConfidence: RequestBody,
         @Part("candidate_pothole[detector_model_version]") detectorModelVersion: RequestBody,
         @Part("candidate_pothole[captured_at]") capturedAt: RequestBody,
+        @Part("candidate_pothole[accelerometer_data]") accelerometerData: RequestBody?,
         @Part("candidate_pothole[bounding_box][left]") boundingBoxLeft: RequestBody,
         @Part("candidate_pothole[bounding_box][top]") boundingBoxTop: RequestBody,
         @Part("candidate_pothole[bounding_box][right]") boundingBoxRight: RequestBody,
@@ -90,4 +92,5 @@ data class CandidateAttributes(
     val longitude: Double,
     @SerialName("detector_confidence") val detectorConfidence: Double,
     @SerialName("detector_model_version") val detectorModelVersion: String? = null,
+    @SerialName("accelerometer_data") val accelerometerData: JsonObject? = null,
 )

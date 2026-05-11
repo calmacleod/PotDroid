@@ -15,4 +15,4 @@ Users sign in, view their uploaded candidates, and confirm or reject detections.
 
 ## Storage
 
-Candidate photos use Active Storage. SQLite is the default database for application, queue, cache, and cable data.
+Candidate photos use Active Storage. Candidate metadata includes detector output and the optional accelerometer data window uploaded by Android. SQLite is the default database for application, queue, cache, and cable data.

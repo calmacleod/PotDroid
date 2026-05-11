@@ -42,6 +42,7 @@ class CandidateUploadWorker(
                     detectorConfidence = candidate.detectorConfidence.body(),
                     detectorModelVersion = candidate.detectorModelVersion.body(),
                     capturedAt = Instant.ofEpochMilli(candidate.capturedAtMillis).toString().body(),
+                    accelerometerData = candidate.accelerometerData?.body(),
                     boundingBoxLeft = candidate.boundingBoxLeft.body(),
                     boundingBoxTop = candidate.boundingBoxTop.body(),
                     boundingBoxRight = candidate.boundingBoxRight.body(),

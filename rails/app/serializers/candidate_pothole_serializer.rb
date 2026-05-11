@@ -17,6 +17,7 @@ class CandidatePotholeSerializer
           detector_confidence: @candidate_pothole.detector_confidence.to_f,
           detector_model_version: @candidate_pothole.detector_model_version,
           bounding_box: @candidate_pothole.bounding_box,
+          accelerometer_data: @candidate_pothole.accelerometer_data,
           image_validation_status: @candidate_pothole.image_validation_status,
           image_validation_results: @candidate_pothole.image_validation_results,
           image_validation_error: @candidate_pothole.image_validation_error,

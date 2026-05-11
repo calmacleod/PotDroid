@@ -106,6 +106,11 @@ paths:
                   type: string
                   format: date-time
                   example: "2026-05-08T12:00:00Z"
+                candidate_pothole[accelerometer_data]:
+                  type: string
+                  contentMediaType: application/json
+                  description: Optional JSON sensor window captured around the detector event.
+                  example: '{"sensor_type":"linear_acceleration","sensor_name":"Pixel linear acceleration","includes_gravity":false,"sample_rate_hz":48.5,"window_start_elapsed_millis":1000,"window_end_elapsed_millis":1900,"peak_magnitude":7.2,"bump_threshold":5.0,"bump_detected":true,"samples":[{"elapsed_millis":1000,"x":0.1,"y":0.2,"z":1.1,"magnitude":1.12}]}'
                 candidate_pothole[bounding_box][left]:
                   type: number
                   format: double
@@ -296,6 +301,10 @@ components:
         bounding_box:
           type: object
           additionalProperties: true
+        accelerometer_data:
+          anyOf:
+            - $ref: "#/components/schemas/AccelerometerData"
+            - type: "null"
         image_validation_status:
           type: string
           enum:
@@ -407,6 +416,58 @@ components:
         bottom:
           type: number
           format: double
+    AccelerometerData:
+      type: object
+      properties:
+        sensor_type:
+          type: string
+          example: linear_acceleration
+        sensor_name:
+          type: string
+          example: Pixel linear acceleration
+        includes_gravity:
+          type: boolean
+          example: false
+        sample_rate_hz:
+          type:
+            - number
+            - "null"
+          format: double
+          example: 48.5
+        window_start_elapsed_millis:
+          type: integer
+        window_end_elapsed_millis:
+          type: integer
+        peak_magnitude:
+          type: number
+          format: double
+          example: 7.2
+        bump_threshold:
+          type: number
+          format: double
+          example: 5.0
+        bump_detected:
+          type: boolean
+          example: true
+        samples:
+          type: array
+          items:
+            type: object
+            properties:
+              elapsed_millis:
+                type: integer
+              x:
+                type: number
+                format: double
+              y:
+                type: number
+                format: double
+              z:
+                type: number
+                format: double
+              magnitude:
+                type: number
+                format: double
     ErrorResponse:
       type: object
       properties:
