@@ -172,7 +172,7 @@ class TflitePotholeDetector(
     companion object {
         const val MODEL_ASSET = "pot_yolo_int8.tflite"
         const val MODEL_VERSION = "pot-yolo-int8-780aff5"
-        const val DEFAULT_THRESHOLD = 0.25f
+        const val DEFAULT_THRESHOLD = 0.65f
         private const val RGB_CHANNELS = 3
         private const val YOLO_OUTPUT_COUNT = 1
         private val SSD_LABELS = listOf("null", "object", "Pothole")

@@ -7,6 +7,21 @@ import org.junit.Test
 
 class TflitePotholeDetectorTest {
     @Test
+    fun defaultThresholdRejectsWeakMobileMatches() {
+        val detection = bestYoloPotholeDetection(
+            output = floatArrayOf(320f, 320f, 64f, 128f, 0.64f),
+            outputShape = intArrayOf(1, 5, 1),
+            inputWidth = 640,
+            inputHeight = 640,
+            threshold = TflitePotholeDetector.DEFAULT_THRESHOLD,
+            modelVersion = "test-model",
+            capturedAtMillis = 123L,
+        )
+
+        assertNull(detection)
+    }
+
+    @Test
     fun decodesAttributesFirstYoloOutput() {
         val output = floatArrayOf(
             320f, 160f,
